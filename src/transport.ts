@@ -1,6 +1,8 @@
 import { Identity } from './identity.js';
 import {
   errorForResponse,
+  bodyNamesAField,
+  BadFieldError,
   InvalidFieldError,
   UrlTooLongError,
   type TechnocoreError,
@@ -36,6 +38,21 @@ export const DEFAULT_BASE_URL = 'https://technocore.chat';
  * Override it with `maxUrlBytes` when you know your deployment's real ceiling.
  */
 export const SPEC_STATED_URL_BUDGET_BYTES = 16384;
+
+/**
+ * The request-line length every HTTP implementation is expected to handle.
+ *
+ * RFC 7230 section 3.1.1: "It is RECOMMENDED that all HTTP senders and
+ * recipients support, at a minimum, request-line lengths of 8000 octets."
+ *
+ * This is not a limit and nothing is enforced against it. It is used in exactly
+ * one place: deciding whether a generic 400 on the GET lane is long enough for
+ * "the edge refused the request line" to be worth mentioning in an error
+ * message. Below it, an edge rejecting on length would be violating a
+ * recommendation the whole ecosystem follows, so raising the possibility would
+ * be noise. An external standard rather than a number of our own.
+ */
+export const RFC7230_RECOMMENDED_REQUEST_LINE_BYTES = 8000;
 
 export type FetchLike = (
   url: string,
@@ -142,6 +159,27 @@ export class Transport {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.maxUrlBytes = options.maxUrlBytes ?? SPEC_STATED_URL_BUDGET_BYTES;
     this.#fetch = options.fetch ?? ((url, init) => fetch(url, init));
+  }
+
+  /**
+   * Whether an edge rejection is worth raising as a possibility. INFERRED.
+   *
+   * Two conditions, both required:
+   *   - the body does not name a field, so it is not the shape the application
+   *     is STATED to use for a refused parameter;
+   *   - length is a live explanation, meaning the URL is past the request-line
+   *     length RFC 7230 recommends every implementation support, and past
+   *     anything this edge has already been seen to accept.
+   *
+   * The second clause is why a successful long write silences this: once the
+   * edge has accepted 9000 bytes, a 400 at 8500 is evidence about the
+   * parameters, not about the length.
+   */
+  #mayBeEdgeRejection(body: string, urlBytes: number): boolean {
+    if (bodyNamesAField(body)) return false;
+    if (urlBytes <= RFC7230_RECOMMENDED_REQUEST_LINE_BYTES) return false;
+    if (this.#largestAccepted !== null && urlBytes <= this.#largestAccepted) return false;
+    return true;
   }
 
   #recordRejected(urlBytes: number): void {
@@ -329,6 +367,19 @@ export class Transport {
         url,
         getLaneWriteBytes,
         this.#effectiveMaxUrlBytes(),
+      );
+    }
+
+    if (response.status === 400 && getLaneWriteBytes !== undefined) {
+      // Some edges answer an over-long request line with 400, which collides
+      // with the application's own 400. Nothing is reclassified: this raises
+      // the possibility in the message and leaves the class, the field and the
+      // recovery to the caller.
+      throw new BadFieldError(
+        body,
+        url,
+        this.#mayBeEdgeRejection(body, getLaneWriteBytes),
+        getLaneWriteBytes,
       );
     }
 

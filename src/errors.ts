@@ -54,17 +54,57 @@ export class BadFieldError extends TechnocoreError {
   /** The field the server named, when the first line follows the stated shape. */
   readonly field: string | null;
 
-  constructor(body: string, url: string) {
+  /**
+   * A hint, never a classification.
+   *
+   * Some edges and proxies answer an over-long request line with 400 rather
+   * than 414 or 413, which collides with the application's own 400 — and the
+   * two want opposite responses: a parameter error means fix the request, an
+   * edge rejection means send the identical request down the POST lane.
+   *
+   * The distinguishing signal is STATED [PARAMETERS]: the application's 400
+   * "names the field", e.g. `400 bad from: must be a string`. An edge 400 is
+   * generic — HTML, or nothing at all.
+   *
+   * This is true when the body did not name a field AND the request was a GET
+   * write whose URL was long enough that length is a live explanation. It is
+   * INFERRED, not observed: no such rejection has been seen from this service.
+   * Nothing is reclassified and nothing is retried on the strength of it — the
+   * error is still a BadFieldError, and confirming it means sending the same
+   * write on the POST lane, which is the caller's decision.
+   */
+  readonly mayBeEdgeRejection: boolean;
+
+  constructor(body: string, url: string, mayBeEdgeRejection = false, urlBytes?: number) {
     const field = parseNamedField(body);
+    const base = field === null ? firstLine(body) : `bad ${field}: ${firstLine(body)}`;
     super(
       'BadFieldError',
       400,
       body,
       url,
-      field === null ? firstLine(body) : `bad ${field}: ${firstLine(body)}`,
+      mayBeEdgeRejection
+        ? `${base} — the body does not name a field and this GET write's URL was ` +
+          `${urlBytes ?? Buffer.byteLength(url, 'utf8')} bytes, so this may be an edge ` +
+          `rejecting the request line rather than the service refusing a parameter. ` +
+          `Sending the same write on the POST lane would distinguish them.`
+        : base,
     );
     this.field = field;
+    this.mayBeEdgeRejection = mayBeEdgeRejection;
   }
+}
+
+/**
+ * Whether a body follows the application's stated shape for a refused field.
+ *
+ * STATED [PARAMETERS]: semantic values are "REFUSED with a 400 whose first line
+ * names the field". A body that does not is not necessarily an edge rejection —
+ * it may simply be a 400 in a shape we have not seen — so callers use this to
+ * decide whether to raise a possibility, never to conclude one.
+ */
+export function bodyNamesAField(body: string): boolean {
+  return parseNamedField(body) !== null;
 }
 
 /**

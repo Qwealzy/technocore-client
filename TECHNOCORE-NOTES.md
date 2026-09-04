@@ -254,6 +254,22 @@ A refusal at N bytes proves that N is too many and nothing else, which is why th
 
 One consequence worth stating: on the GET lane a **413 is not the protocol's 413**. STATED, that status is the 256 KiB POST body cap — and a GET carries no body, so a 413 answering one is the edge complaining about the request line. `Transport` maps it by lane for that reason, and the POST-lane 413 still surfaces as `PayloadTooLargeError`.
 
+**A generic 400 on the GET lane may also be the edge, and this one cannot be resolved.** *(INFERRED — not probed)*
+
+Some edges and proxies answer an over-long request line with **400** rather than 414 or 413. That collides with the application's own 400, and the two want opposite responses: a semantic-parameter error means fix the request, an edge rejection means send the identical request down the POST lane.
+
+The distinguishing signal is STATED [PARAMETERS]: the application's 400 "names the field", e.g. `400 bad from: must be a string` — a shape confirmed by the probed `400 bad if_absent: refused with if= — send one condition, not both`. An edge 400 is generic: HTML, or an empty body.
+
+That signal is suggestive, not decisive, so **nothing is reclassified and nothing is retried**. A 400 stays a `BadFieldError` with `field: null`. What the client does is raise the possibility in the error message, and expose `mayBeEdgeRejection` so a caller need not match on strings. Both are hints; neither is a classification.
+
+The message appears only when all three hold:
+
+1. the body does not name a field, so it is not the shape the application is stated to use;
+2. the URL is longer than **8000 bytes** — the request-line length RFC 7230 §3.1.1 recommends every HTTP implementation support. Below that, an edge rejecting on length would be violating a recommendation the whole ecosystem follows, so raising it would be noise. This is an external standard, not a threshold of ours, and it gates only what an error message says — no behaviour depends on it;
+3. the URL is longer than anything this transport has already seen this edge accept. Once 12000 bytes has worked, a 400 at 11000 is evidence about the parameters, not about the length.
+
+**This entry is INFERRED and deliberately so.** No such rejection has been observed from `technocore.chat` or from any edge in front of it. It is reasoning about how HTTP intermediaries behave, written down because the failure would otherwise be silent and misleading: a caller would read "bad request", go looking for the wrong parameter, and never think to try the other lane. If you ever see this hint fire, sending the same write on the POST lane is what settles it — and that observation would be worth adding here as PROBED.
+
 **The GET lane's real limit is URL bytes, not the character cap.** *(STATED — URL BUDGET)*
 Percent-encoding costs 3 bytes per UTF-8 byte, and break-even against a ~16 KB URL and a 4096-character cap is 4 bytes per character. It is explicitly **not** the Latin/non-Latin line: dense Vietnamese and dense Polish are Latin and blow the budget. Measure the encoded URL of the actual text; never guess from the script.
 
