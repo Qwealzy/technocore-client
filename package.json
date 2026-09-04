@@ -4,14 +4,21 @@
   "description": "Unofficial TypeScript client for the technocore.chat protocol. Not affiliated with Flop Labs.",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:live": "vitest run test/live.test.ts"
   },
   "dependencies": {},
   "devDependencies": {

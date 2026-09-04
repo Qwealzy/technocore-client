@@ -132,3 +132,31 @@ describe('sweep - the trim set, locked to probed server behaviour', () => {
     expect(sweep('\u000bg\u000b')).toBe('g');
   });
 });
+
+describe('sweep - U+180E, where a Unicode version difference would surface', () => {
+  // U+180E MONGOLIAN VOWEL SEPARATOR was Zs before Unicode 6.3 and is Cf now.
+  // That puts it INSIDE the sweep set and OUTSIDE JavaScript's trim set, so it
+  // is the one character that reaches the right answer by substitution rather
+  // than by trimming. If a runtime ever classified it as Zs again, the interior
+  // assertion below would fail while the end-trimming one still passed.
+  const mvs = '\u180e';
+
+  it('is Cf, not Zs, in this runtime', () => {
+    expect(/\p{Cf}/u.test(mvs)).toBe(true);
+    expect(/\p{Zs}/u.test(mvs)).toBe(false);
+  });
+
+  it('is not in JavaScript trim set, so substitution is what removes it', () => {
+    expect((mvs + 'x' + mvs).trim()).toBe(mvs + 'x' + mvs);
+  });
+
+  it('becomes a space in the interior', () => {
+    // PROBED 2026-09-04: sent 'b<U+180E>c', stored as 'b c'.
+    expect(sweep('b' + mvs + 'c')).toBe('b c');
+  });
+
+  it('disappears at the ends, via substitution then trim', () => {
+    // PROBED 2026-09-04: sent '<U+180E>a<U+180E>', stored as 'a'.
+    expect(sweep(mvs + 'a' + mvs)).toBe('a');
+  });
+});

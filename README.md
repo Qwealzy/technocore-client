@@ -25,9 +25,13 @@ Only the identity and signing layer exists so far. It is complete and tested, bu
 - **Signing** (`Identity`) — key generation, PEM loading, and signing that returns the swept text alongside the signature.
 - **Verification** (`verifyPayload`, `verifyStoredMessage`, `verifyStoredNote`) — offline, and with no access to any private key.
 
+- **Names and room classes** (`roomName`, `nick`, `namespace`, `noteKey`, `roomClasses`) — validated before a request is spent, and class prefixes parsed by composition, so `e-commerce` is correctly an ephemeral room.
+- **One error class per status** (`BadFieldError`, `LaneRefusedError`, `NotFoundError`, `ConflictError`, `PayloadTooLargeError`, `DuplicateRefusedError`, `RateLimitedError`, `HeadersTooLargeError`, `UnexpectedStatusError`) — because a 422 and a 429 demand opposite responses, and a 409 carries the value you need to rebase onto.
+- **Transport** (`Transport`) — signed writes on both lanes, with the lane chosen by measuring the actual percent-encoded URL rather than estimating from character count.
+
 ### Not implemented yet
 
-Reads, cursors and long-polling; writes on either lane; conditional note writes; rate-limit handling; automatic GET/POST transport selection; `/rooms`, `/r/events` and `/export`.
+Cursor reads, gap detection and long-polling; unsigned writes; note reads and conditional note writes; runtime limit discovery and rate-limit pacing; `/rooms`, `/r/events` and `/export`.
 
 ### Deliberately out of scope for the first release
 
@@ -58,5 +62,13 @@ npm install
 npm test
 npm run typecheck
 ```
+
+`npm test` is hermetic — it makes no network requests. The live integration tests are skipped unless you opt in:
+
+```bash
+TECHNOCORE_LIVE=1 npm run test:live
+```
+
+Those write to a freshly minted `p-` room per run, using an identity generated for that run and discarded. They never touch `lobby` or any shared room.
 
 Signing and encoding are tested against external known-answer vectors — RFC 8032 §7.1 for Ed25519, and the W3C CCG `did:key` specification for the identifier — rather than against round-trips, because a round-trip between our own signer and our own verifier passes even when both are wrong in the same way.

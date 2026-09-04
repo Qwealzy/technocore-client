@@ -16,7 +16,13 @@ Authority order, per `CLAUDE.md`: prose > `/openapi.json` and `/config` > live p
 
 ---
 
-## Open questions
+## Resolved by probe
+
+> **Everything in this section is PROBED, and PROBED is the weakest label in this file.**
+>
+> These are the most useful findings here and the most fragile. Each was observed from one deployment — `technocore.chat` — on **2026-09-04**, at one moment, running the version `/config` then reported as `0.11.4`. None of it is stated in the prose, so none of it is promised. A different deployment, or this one after an upgrade, may behave differently and would not be violating the specification by doing so.
+>
+> Each finding below is pinned by a test, so a change surfaces as a failure rather than as a mystery. Treat a failure there as "the server moved", not as "the test is flaky".
 
 ### Q1 — the exact trim set (RESOLVED, PROBED 2026-09-04)
 
@@ -37,6 +43,11 @@ PROBED: each character below was written as `<char>x<char>` on the unsigned lane
 | U+000B vertical tab (Cc) | stripped | becomes a space |
 | U+2028 line separator (Zl) | stripped | becomes a space |
 | U+2029 paragraph separator (Zp) | stripped | becomes a space |
+| U+180E Mongolian vowel separator (Cf) | stripped | **becomes a space** |
+
+*(Every row above is PROBED, not stated. See the caveat at the top of this section.)*
+
+U+180E is worth its own line: it was Zs before Unicode 6.3 and is Cf now, which puts it **inside** the sweep set and **outside** JavaScript's trim set. It is the only character that reaches the right answer by substitution rather than by trimming, and therefore the only place a Unicode version difference between us and the server could surface. PROBED: `b<U+180E>c` came back as `b c` — substituted, confirming the server also treats it as Cf. If a runtime ever classified it as Zs again, the interior assertion in `test/sweep.test.ts` fails while the end-trimming one still passes.
 
 **The server's trim strips every Zs, not just U+0020.** Interior Zs is preserved, which is what makes the sweep set observable from outside: Cc/Cf/Cs/Co/Zl/Zp become spaces anywhere in the string, while Zs is only removed at the ends and only by the trim.
 
@@ -222,6 +233,9 @@ Rebase from the conflict body. Re-reading the note costs a read and opens a fres
 Winning a CAS does not stop a stalled peer that still believes it holds a claim. This library does not present conditional writes as a lock or a lease.
 
 ### Transport
+
+**The URL budget is the one number this client cannot read at runtime.** *(STATED as approximate — URL BUDGET)*
+STATED: "its real limit is URL length (~16 KB at the edge)". Every other limit this client cares about is published — the rate buckets, the character caps, the ephemeral TTL and the duplicate window are all in `/config` and `/.well-known/agent.json`, and are read from there. The URL ceiling is not: it belongs to whatever CDN or proxy sits in front of an instance, no endpoint publishes it, and the prose gives it with a tilde. So `SPEC_STATED_URL_BUDGET_BYTES` in `src/transport.ts` is a named, documented, overridable default rather than a value read at startup — the single exception in this package, and called out here so it is not mistaken for an oversight. `Transport` takes `maxUrlBytes` for deployments whose real ceiling is known.
 
 **The GET lane's real limit is URL bytes, not the character cap.** *(STATED — URL BUDGET)*
 Percent-encoding costs 3 bytes per UTF-8 byte, and break-even against a ~16 KB URL and a 4096-character cap is 4 bytes per character. It is explicitly **not** the Latin/non-Latin line: dense Vietnamese and dense Polish are Latin and blow the budget. Measure the encoded URL of the actual text; never guess from the script.
