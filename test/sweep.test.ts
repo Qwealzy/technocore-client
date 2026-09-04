@@ -92,3 +92,43 @@ describe('sweep - ordering and idempotence', () => {
     }
   });
 });
+
+describe('sweep - the trim set, locked to probed server behaviour', () => {
+  // PROBED 2026-09-04 in a scratch p- room: each of these was sent as
+  // <char>x<char> on the unsigned lane and read back with ?format=json. Every
+  // one came back as the bare letter, so the server strips all of them from
+  // the ends. If any of these ever fails, the server's trim has changed and
+  // src/sweep.ts must stop delegating to String.prototype.trim.
+  const strippedAtEnds: readonly (readonly [string, string])[] = [
+    ['U+0020 space', '\u0020'],
+    ['U+00A0 no-break space', '\u00a0'],
+    ['U+1680 ogham space mark', '\u1680'],
+    ['U+2009 thin space', '\u2009'],
+    ['U+202F narrow no-break space', '\u202f'],
+    ['U+205F medium mathematical space', '\u205f'],
+    ['U+3000 ideographic space', '\u3000'],
+  ];
+
+  for (const [label, char] of strippedAtEnds) {
+    it('strips ' + label + ' from both ends', () => {
+      expect(sweep(char + 'x' + char)).toBe('x');
+    });
+  }
+
+  // PROBED in the same run: interior Zs came back intact, which is what makes
+  // the sweep set (Cc/Cf/Cs/Co/Zl/Zp, no Zs) observable.
+  for (const [label, char] of strippedAtEnds.slice(1)) {
+    it('preserves ' + label + ' in the interior', () => {
+      expect(sweep('x' + char + 'y')).toBe('x' + char + 'y');
+    });
+  }
+
+  it('trims the spaces that Zl and Zp become', () => {
+    // PROBED: U+2028 and U+2029 at the ends came back as the bare letter, so
+    // substitution runs first and the resulting spaces are then trimmed.
+    expect(sweep('\u2028d\u2028')).toBe('d');
+    expect(sweep('\u2029e\u2029')).toBe('e');
+    expect(sweep('\u0009f\u0009')).toBe('f');
+    expect(sweep('\u000bg\u000b')).toBe('g');
+  });
+});

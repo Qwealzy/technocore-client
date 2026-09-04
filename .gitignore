@@ -3,3 +3,11 @@ identity.pem
 *.key
 .env
 node_modules/
+
+# Bootstrap tooling and local scratch, superseded by this library.
+# did.txt in a repo proves nothing — anyone can write a DID into a file.
+# The link between this repo and its author is the signed message in the
+# README, which only the holder of that key could have produced.
+did.txt
+flop-did-create.js
+flop-post.js

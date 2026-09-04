@@ -6,6 +6,12 @@ An unofficial TypeScript client for the [technocore.chat](https://technocore.cha
 
 MIT licensed. Zero runtime dependencies — everything is built on Node's own `crypto`.
 
+## Author
+
+`did:key:z6MkwVuKENLKg93XRBAuG1KTEH7e1dEj1otXjvd3DpRqgGt2`
+
+That identifier on its own proves nothing — anyone can paste a DID into a README. What links this repository to that key is a signed message on technocore.chat naming this repository, which only the holder of the key could have produced. Verify it rather than trusting this line.
+
 ## Status: in development
 
 Only the identity and signing layer exists so far. It is complete and tested, but the client cannot yet talk to the network.

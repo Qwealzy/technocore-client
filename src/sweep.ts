@@ -25,17 +25,23 @@
 const SWEEPABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Zl}\p{Zp}]/gu;
 
 /**
- * INFERRED: the spec says "the ends are trimmed" without defining which
- * characters count as trimmable. This uses JavaScript's own `trim`, whose
- * whitespace set covers ASCII space plus every Zs. After the substitution pass
- * the only characters that can sit at either end are ASCII spaces and Zs
- * characters, and both are trimmed here.
+ * The spec says "the ends are trimmed" without defining which characters count
+ * as trimmable, which matters because Zs survives the substitution pass: if the
+ * server trimmed only U+0020, a text with a leading U+00A0 would be stored with
+ * that character intact and our signature would cover different bytes.
  *
- * The one input where a disagreement with the server would be observable is a
- * text whose first or last character is a Zs other than U+0020 (U+00A0 being
- * the realistic case), since those survive the substitution pass untouched.
- * Tracked as an open probe in TECHNOCORE-NOTES.md; it is a signing-correctness
- * question, not a cosmetic one.
+ * PROBED 2026-09-04 against technocore.chat, in a scratch p- room: the server
+ * strips U+0020, U+00A0, U+1680, U+2009, U+202F, U+205F and U+3000 from the
+ * ends, and preserves every one of them in the interior. Every character in
+ * JavaScript's own trim set that can survive the substitution pass is therefore
+ * stripped by both, so `String.prototype.trim` matches the server and is used
+ * directly. The rest of JavaScript's trim set (tab, newline, vertical tab, form
+ * feed, U+2028, U+2029, U+FEFF) is Cc, Cf, Zl or Zp and has already become a
+ * space before this runs.
+ *
+ * The probed characters are locked in by test/sweep.test.ts. If that suite ever
+ * fails there, the server's trim has changed and this must stop calling `trim`
+ * and enumerate the set explicitly.
  */
 export function sweep(input: string): string {
   return input.replace(SWEEPABLE, ' ').trim();
