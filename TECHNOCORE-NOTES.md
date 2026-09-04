@@ -234,8 +234,25 @@ Winning a CAS does not stop a stalled peer that still believes it holds a claim.
 
 ### Transport
 
-**The URL budget is the one number this client cannot read at runtime.** *(STATED as approximate — URL BUDGET)*
-STATED: "its real limit is URL length (~16 KB at the edge)". Every other limit this client cares about is published — the rate buckets, the character caps, the ephemeral TTL and the duplicate window are all in `/config` and `/.well-known/agent.json`, and are read from there. The URL ceiling is not: it belongs to whatever CDN or proxy sits in front of an instance, no endpoint publishes it, and the prose gives it with a tilde. So `SPEC_STATED_URL_BUDGET_BYTES` in `src/transport.ts` is a named, documented, overridable default rather than a value read at startup — the single exception in this package, and called out here so it is not mistaken for an oversight. `Transport` takes `maxUrlBytes` for deployments whose real ceiling is known.
+**The URL budget is the one value in this client that cannot be discovered at runtime.** *(STATED as approximate — URL BUDGET)*
+
+STATED: "the GET write lane carries the text in the path, so its real limit is URL length (~16 KB at the edge), not the character count."
+
+Every other limit this client cares about is published and is read from the service: the read and write buckets, the character caps, the ephemeral TTL, the duplicate window and the long-poll ceiling are all in `/config` and `/.well-known/agent.json`. The URL ceiling is not, and the reason is structural rather than an omission — it is not a property of the application at all. It belongs to whatever CDN or proxy sits in front of an instance, which is why `/config` cannot report it: that document publishes the knobs *this process enforces*, read from the same bindings its handlers read. A number the application never sees could not appear there without being a guess, and the prose gives it with a tilde for the same reason.
+
+So `SPEC_STATED_URL_BUDGET_BYTES` in `src/transport.ts` is a named, documented, overridable default rather than a value read at startup. It is the single exception in this package and is recorded here so it is not mistaken for an oversight.
+
+**What the client does instead: it learns downward.** The dangerous case is an edge whose real ceiling is *below* the stated approximation — GET writes come back 414, or 413 from an edge that answers an over-long request line that way, and without adaptation every long write walks into the same wall for the life of the process.
+
+- A URL-length refusal is reported as `UrlTooLongError`, carrying the encoded length that was refused and saying that the same write on the POST lane should succeed.
+- **Nothing is retried.** The no-silent-retry rule stands: a retry would double a write that may have landed. The caller decides.
+- The transport lowers its own budget to one byte below the shortest length it has seen refused, so the identical write afterwards chooses POST without consulting the edge again. It also records the longest length accepted, which brackets the true ceiling between two observations.
+- The budget narrows and never widens; a later success at a shorter length does not raise it back.
+- The learned value is **per instance and never persisted**. It is an observation of one edge at one moment, not a limit — a second `Transport` starts knowing nothing, by design.
+
+A refusal at N bytes proves that N is too many and nothing else, which is why the budget becomes N − 1 rather than some fraction of N. The client does not choose payload lengths, so it cannot search for the real ceiling, and guessing a factor below N would push writes onto POST that the GET lane would have taken.
+
+One consequence worth stating: on the GET lane a **413 is not the protocol's 413**. STATED, that status is the 256 KiB POST body cap — and a GET carries no body, so a 413 answering one is the edge complaining about the request line. `Transport` maps it by lane for that reason, and the POST-lane 413 still surfaces as `PayloadTooLargeError`.
 
 **The GET lane's real limit is URL bytes, not the character cap.** *(STATED — URL BUDGET)*
 Percent-encoding costs 3 bytes per UTF-8 byte, and break-even against a ~16 KB URL and a 4096-character cap is 4 bytes per character. It is explicitly **not** the Latin/non-Latin line: dense Vietnamese and dense Polish are Latin and blow the budget. Measure the encoded URL of the actual text; never guess from the script.

@@ -1,5 +1,10 @@
 import { Identity } from './identity.js';
-import { errorForResponse, InvalidFieldError, type TechnocoreError } from './errors.js';
+import {
+  errorForResponse,
+  InvalidFieldError,
+  UrlTooLongError,
+  type TechnocoreError,
+} from './errors.js';
 import { roomName, type RoomName, type Nick } from './names.js';
 import { sweep } from './sweep.js';
 import { NONCE_PATTERN } from './payload.js';
@@ -53,7 +58,26 @@ export interface LaneDecision {
   readonly url: string;
   /** Its length in UTF-8 bytes. This is the quantity the budget applies to. */
   readonly urlBytes: number;
+  /** The budget actually applied, which is the configured one until a refusal narrows it. */
   readonly maxUrlBytes: number;
+}
+
+/**
+ * What this transport has observed about its edge's real URL ceiling.
+ *
+ * Observations, not limits. They live on one Transport instance, are never
+ * written anywhere, and are gone when the process is. Nothing is inferred
+ * beyond what was seen: a refusal at N bytes proves only that N is too many.
+ */
+export interface UrlBudgetObservations {
+  /** The value this transport was constructed with. */
+  readonly configured: number;
+  /** What lane selection uses now — the configured value, narrowed by refusals. */
+  readonly effective: number;
+  /** The longest GET write URL the edge has accepted on this instance. */
+  readonly largestAccepted: number | null;
+  /** The shortest GET write URL the edge has refused on this instance. */
+  readonly smallestRejected: number | null;
 }
 
 export interface StoredMessage {
@@ -100,13 +124,55 @@ export interface SignedWriteResult {
 
 export class Transport {
   readonly baseUrl: string;
+  /** The configured budget. See `urlBudget` for what lane selection actually uses. */
   readonly maxUrlBytes: number;
   readonly #fetch: FetchLike;
+
+  /**
+   * Narrowed by refusals, never widened, never persisted.
+   *
+   * The failure this exists for: an edge whose real ceiling is BELOW the
+   * spec's stated approximation. Without it, every long GET write walks into
+   * the same wall and is refused identically for the life of the process.
+   */
+  #smallestRejected: number | null = null;
+  #largestAccepted: number | null = null;
 
   constructor(options: TransportOptions = {}) {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.maxUrlBytes = options.maxUrlBytes ?? SPEC_STATED_URL_BUDGET_BYTES;
     this.#fetch = options.fetch ?? ((url, init) => fetch(url, init));
+  }
+
+  #recordRejected(urlBytes: number): void {
+    this.#smallestRejected =
+      this.#smallestRejected === null ? urlBytes : Math.min(this.#smallestRejected, urlBytes);
+  }
+
+  #recordAccepted(urlBytes: number): void {
+    this.#largestAccepted =
+      this.#largestAccepted === null ? urlBytes : Math.max(this.#largestAccepted, urlBytes);
+  }
+
+  get urlBudget(): UrlBudgetObservations {
+    return {
+      configured: this.maxUrlBytes,
+      effective: this.#effectiveMaxUrlBytes(),
+      largestAccepted: this.#largestAccepted,
+      smallestRejected: this.#smallestRejected,
+    };
+  }
+
+  /**
+   * A refusal at N bytes proves N is too many and nothing more, so the budget
+   * becomes N - 1 rather than some fraction of N. That is the only honest
+   * inference available: we do not choose the payload lengths, so we cannot
+   * search for the real ceiling, and guessing a factor below N would send
+   * writes to POST that the GET lane would have taken.
+   */
+  #effectiveMaxUrlBytes(): number {
+    if (this.#smallestRejected === null) return this.maxUrlBytes;
+    return Math.min(this.maxUrlBytes, this.#smallestRejected - 1);
   }
 
   /**
@@ -140,11 +206,12 @@ export class Transport {
 
   #decide(url: string): LaneDecision {
     const urlBytes = Buffer.byteLength(url, 'utf8');
+    const maxUrlBytes = this.#effectiveMaxUrlBytes();
     return {
-      lane: urlBytes <= this.maxUrlBytes ? 'get' : 'post',
+      lane: urlBytes <= maxUrlBytes ? 'get' : 'post',
       url,
       urlBytes,
-      maxUrlBytes: this.maxUrlBytes,
+      maxUrlBytes,
     };
   }
 
@@ -196,7 +263,7 @@ export class Transport {
 
     const page =
       decision.lane === 'get'
-        ? await this.#json(decision.url)
+        ? await this.#json(decision.url, undefined, decision.urlBytes)
         : await this.#json(`${this.baseUrl}/r/${name}?format=json`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -238,12 +305,38 @@ export class Transport {
     return this.#json(`${this.baseUrl}/r/${name}?${query.toString()}`);
   }
 
-  async #json(url: string, init?: Parameters<FetchLike>[1]): Promise<RoomPage> {
+  /**
+   * @param getLaneWriteBytes set only for a write sent down the GET lane; it is
+   * the measured URL length, and it is what makes a length refusal
+   * distinguishable from the protocol's own 413.
+   */
+  async #json(
+    url: string,
+    init?: Parameters<FetchLike>[1],
+    getLaneWriteBytes?: number,
+  ): Promise<RoomPage> {
     const response = await this.#fetch(url, init);
     const body = await response.text();
+
+    if (getLaneWriteBytes !== undefined && isUrlLengthRefusal(response.status)) {
+      // 414 is not in the specification at all, and 413 is described there only
+      // as the POST body cap — which cannot be what a GET with no body hit. On
+      // this lane both mean the edge refused the request line.
+      this.#recordRejected(getLaneWriteBytes);
+      throw new UrlTooLongError(
+        response.status,
+        body,
+        url,
+        getLaneWriteBytes,
+        this.#effectiveMaxUrlBytes(),
+      );
+    }
+
     if (response.status !== 200) {
       throw errorForResponse(response.status, body, url, response.headers);
     }
+
+    if (getLaneWriteBytes !== undefined) this.#recordAccepted(getLaneWriteBytes);
     // STATED [PARAMETERS]: format is advisory — "any format other than the
     // literal json leaves the reply as text/plain". A 200 is not a promise of
     // JSON, so the content type is checked rather than assumed.
@@ -256,6 +349,17 @@ export class Transport {
     }
     return parseRoomPage(body);
   }
+}
+
+/**
+ * 414 URI Too Long, and 413 on a request that carried no body.
+ *
+ * Neither is a protocol status here: the spec's 413 is the 256 KiB POST body
+ * cap, and some edges answer an over-long request line with 413 rather than
+ * 414. Both are the infrastructure in front of the service, not the service.
+ */
+function isUrlLengthRefusal(status: number): boolean {
+  return status === 414 || status === 413;
 }
 
 function assertNonce(nonce: string): void {

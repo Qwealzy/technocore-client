@@ -201,6 +201,44 @@ export class HeadersTooLargeError extends TechnocoreError {
 }
 
 /**
+ * The GET write lane was refused because the URL was too long.
+ *
+ * NOT a protocol status. The specification describes 414 nowhere, and describes
+ * 413 only as the POST body cap — this is the edge in front of an instance
+ * refusing the request line before the application ever sees it. STATED [URL
+ * BUDGET] only that the ceiling is "~16 KB at the edge", approximately and
+ * without a way to look it up.
+ *
+ * Nothing was retried. STATED per CLAUDE.md and the no-silent-retry rule: the
+ * same write on the POST lane is the recovery, and that is the caller's call to
+ * make, not this library's — a retry would double a write that may in principle
+ * have landed.
+ *
+ * The transport that raised this has already lowered its own budget below
+ * `urlBytes`, so a subsequent identical call chooses POST without asking the
+ * edge again.
+ */
+export class UrlTooLongError extends TechnocoreError {
+  /** The encoded URL length, in bytes, that was refused. */
+  readonly urlBytes: number;
+  /** The transport's budget after learning from this refusal. */
+  readonly effectiveMaxUrlBytes: number;
+
+  constructor(status: number, body: string, url: string, urlBytes: number, effective: number) {
+    super(
+      'UrlTooLongError',
+      status,
+      body,
+      url,
+      `the GET write lane was refused at ${urlBytes} URL bytes (HTTP ${status}); ` +
+        `the budget is now ${effective} bytes and the same write on the POST lane should succeed`,
+    );
+    this.urlBytes = urlBytes;
+    this.effectiveMaxUrlBytes = effective;
+  }
+}
+
+/**
  * A status the specification does not describe for this endpoint.
  *
  * Deliberately its own class rather than being folded into a neighbour: the
