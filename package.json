@@ -22,7 +22,6 @@
     "test": "npm run check:chars && vitest run",
     "test:live": "vitest run test/live.test.ts"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
@@ -31,7 +30,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/technocore-client.git"
+    "url": "git+https://github.com/Qwealzy/technocore-client.git"
   },
   "keywords": [
     "technocore",
