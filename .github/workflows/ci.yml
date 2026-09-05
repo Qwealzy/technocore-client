@@ -1,0 +1,43 @@
+name: CI
+
+# Runs on every push and pull request, so the checks below happen whether or
+# not anyone remembers to run them locally. The control-character check in
+# particular exists for a bug class the test suite cannot catch on its own:
+# see scripts/check-control-characters.mjs.
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22', '24']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      # Runs before the suite: a file git treats as binary should fail the
+      # build even if every assertion in it passes.
+      - name: Check for raw control characters
+        run: npm run check:chars
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `npm test` is hermetic and makes no network requests. The live
+      # integration tests are not run in CI: they write to the public service.
+      - name: Test
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build

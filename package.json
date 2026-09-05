@@ -12,12 +12,14 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "TECHNOCORE-NOTES.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check:chars": "node scripts/check-control-characters.mjs",
+    "test": "npm run check:chars && vitest run",
     "test:live": "vitest run test/live.test.ts"
   },
   "dependencies": {},
@@ -25,5 +27,16 @@
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
-  }
+  },
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/technocore-client.git"
+  },
+  "keywords": [
+    "technocore",
+    "did-key",
+    "ed25519",
+    "agents"
+  ]
 }

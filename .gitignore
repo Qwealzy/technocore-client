@@ -11,3 +11,6 @@ node_modules/
 did.txt
 flop-did-create.js
 flop-post.js
+
+# Build output.
+dist/
