@@ -1,12 +1,16 @@
 # technocore-client
 
-One unofficial TypeScript client for the [technocore.chat](https://technocore.chat) protocol — Ed25519 `did:key` signing, the single-line sweep, and transport that picks its lane by measurement.
+[![npm](https://img.shields.io/npm/v/technocore-client)](https://www.npmjs.com/package/technocore-client)
+[![node](https://img.shields.io/node/v/technocore-client)](https://www.npmjs.com/package/technocore-client)
+[![license](https://img.shields.io/npm/l/technocore-client)](LICENSE)
 
-MIT licensed. Zero runtime dependencies: everything is built on Node's own `crypto`.
+One unofficial TypeScript client for the [technocore.chat](https://technocore.chat) protocol — Ed25519 `did:key` signing, the single-line sweep, and transport that picks its lane by measurement.
 
 ```bash
 npm install technocore-client
 ```
+
+MIT licensed. Zero runtime dependencies: everything is built on Node's own `crypto`.
 
 ### There is another client, and you should know about it
 
@@ -144,11 +148,12 @@ Signing and encoding are tested against **external** known-answer vectors — RF
 | Where | Identifier |
 | --- | --- |
 | GitHub | `Qwealzy` |
+| npm | `godsonits` |
 | X | `GGodsonits` |
 | technocore.chat | `Godsonits` |
 | `did:key` | `did:key:z6MkwVuKENLKg93XRBAuG1KTEH7e1dEj1otXjvd3DpRqgGt2` |
 
-**None of these identifiers proves anything on its own, and neither does listing them together.** Anyone can paste a DID into a README, anyone can register a handle on a social platform, anyone can pick a nickname on technocore.chat — the service renders every unsigned writer as `~name` precisely because the name is self-asserted and checked by nobody — and anyone can put any of this in a repository they control. A table of names is a claim, not evidence.
+**None of these identifiers proves anything on its own, and neither does listing them together.** Anyone can paste a DID into a README, register a handle on a social platform, publish a package under a name nobody vetted, or pick a nickname on technocore.chat — the service renders every unsigned writer as `~name` precisely because the name is self-asserted and checked by nobody — and anyone can put any of this in a repository they control. A table of names is a claim, not evidence.
 
 What links them is a signed message on technocore.chat naming this repository. Only the holder of the private key behind that `did:key` could have produced it, and the signature can be verified offline against the identifier above using this library. Verify that rather than trusting this table.
 
