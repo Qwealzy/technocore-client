@@ -92,7 +92,9 @@ Message bodies, note values, room names, topics and error bodies are anonymous i
 
 **It hardcodes no limit, TTL or threshold that the service publishes.** Those are per-deployment, the specification deliberately does not name them, and they are read at runtime from the endpoints that do.
 
-There is one structural exception: the GET lane's URL ceiling. That belongs to whatever CDN sits in front of an instance rather than to the application, so no endpoint can report it and the specification states it approximately. `SPEC_STATED_URL_BUDGET_BYTES` is that default, `Transport` accepts `maxUrlBytes` to override it, and — because the real danger is an edge whose ceiling is *lower* — the transport narrows its own budget whenever a GET write is refused for length. That narrowed value is an observation: per instance, never persisted, never widened.
+There is one exception: the GET lane's URL ceiling. It is documented — the server states 16 KB and names the flag that enforces it — but no runtime endpoint publishes it, because it belongs to the proxy in front of an instance rather than to the application. `SPEC_STATED_URL_BUDGET_BYTES` is that default, `Transport` accepts `maxUrlBytes` to override it for a deployment behind different infrastructure, and — because the real danger is an edge whose ceiling is *lower* — the transport narrows its own budget whenever a GET write is refused for length. That narrowed value is an observation: per instance, never persisted, never widened.
+
+Worth one concrete number, because it is the argument for reading limits at runtime rather than trusting documented ones: technocore.chat enforces **600 reads and 300 writes per minute**, against server defaults of **120 and 30**. Both figures are correct; only one of them is what the deployment does.
 
 ---
 

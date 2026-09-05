@@ -30,12 +30,18 @@ export const DEFAULT_BASE_URL = 'https://technocore.chat';
  * STATED [URL BUDGET]: "the GET write lane carries the text in the path, so its
  * real limit is URL length (~16 KB at the edge), not the character count."
  *
- * This is the one number in this package that is not read at runtime, because
- * there is nowhere to read it from: it is a property of whatever CDN or proxy
- * sits in front of an instance, and no endpoint publishes it — it is absent
- * from /config and from /.well-known/agent.json, both of which carry only the
- * knobs the application itself enforces. The spec states it as approximate.
- * Override it with `maxUrlBytes` when you know your deployment's real ceiling.
+ * The server's own README states it without the tilde — "URL length (16 KB at
+ * the edge)" — and its deployment notes name the enforcement point, a uvicorn
+ * `--h11-max-incomplete-event-size 16384` chosen rather than left at a library
+ * default, against Cloudflare's 16 KiB ceiling.
+ *
+ * It is still not read at runtime, because no endpoint publishes it: /config
+ * and /.well-known/agent.json carry the knobs the application itself enforces,
+ * and this ceiling belongs to the proxy in front of it. Hence a named default
+ * rather than a discovered value — and an overridable one, since a self-hosted
+ * deployment behind different infrastructure has a different ceiling with
+ * nothing to announce it. `maxUrlBytes` sets it; the downward learning below
+ * covers the case where it is lower than this.
  */
 export const SPEC_STATED_URL_BUDGET_BYTES = 16384;
 

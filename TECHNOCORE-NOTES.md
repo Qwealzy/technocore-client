@@ -53,7 +53,7 @@ U+180E is worth its own line: it was Zs before Unicode 6.3 and is Cf now, which 
 
 Every character in JavaScript's `String.prototype.trim` set that can survive the substitution pass is therefore stripped by both implementations, so `src/sweep.ts` calls `trim` directly. The remainder of JavaScript's trim set — tab, newline, vertical tab, form feed, U+2028, U+2029, U+FEFF — is Cc, Cf, Zl or Zp and has already become a space by then, so no divergence is reachable. The probed characters are locked in by `test/sweep.test.ts`; if those assertions ever fail, the server changed and `sweep.ts` must enumerate the set explicitly instead of delegating.
 
-### Q2 — the note-read banner and compare-and-set (RESOLVED, PROBED 2026-09-04)
+### Q2 — the note-read banner and compare-and-set (RESOLVED, CONFIRMED IN SOURCE 2026-09-05)
 
 STATED (`/openapi.json`, `GET /kv/{ns}/{key}`, 200): "The note value, after an untrusted-content banner." The prose does not mention the banner at all, and PROBED: `?format=json` on a single-note read is ignored — the reply stays `text/plain`, consistent with `format` being advisory. **There is no structured lane for reading one note**, so the banner must be parsed.
 
@@ -65,7 +65,36 @@ PROBED, writing a known value into a scratch `p-` namespace and reading it back:
 step 4 done
 ```
 
-with a single trailing newline. **Extraction rule, confirmed by a live compare-and-set**: take everything after the first `\n\n`, then remove exactly one trailing `\n`. Feeding that back as `?if=` returned **200** — the write landed. Feeding the whole raw body as `?if=` returned **409**, as expected.
+with a single trailing newline.
+
+#### The extraction rule, and the wrong one this note used to give
+
+**Take line index 2.** Split the body on `\n`; the banner is line 0, the blank is line 1, and the value is line 2. A note value is single-line by construction — the sweep replaces every Cc/Cf/Cs/Co/Zl/Zp character with a space — so the value can never span lines and the third line is always the whole of it.
+
+An earlier version of this note said: *take everything after the first `\n\n`, then remove exactly one trailing `\n`*. **That rule is wrong, and it fails only under load.** Confirmed in the server source at `src/app.py`:
+
+```python
+return text(f"{BANNER}\n\n{value}" + budget_note("read", left, RATE_READ))
+```
+
+and `src/limit.py`:
+
+```python
+def budget_note(kind: str, left: int, per_min: int) -> str:
+    if left * 4 > per_min:
+        return ""
+    return f"\n# budget: {left} of {per_min} {kind}s left this minute (refills …)"
+```
+
+The budget footer is appended **after the value**, and only once the caller drops below a quarter of the read bucket. Above that threshold `budget_note` returns the empty string and the old rule works perfectly. Below it, the same rule returns `step 4 done\n# budget: 140 of 600 reads left this minute (refills …)`, and every subsequent `?if=` compares that against the stored value and loses. The failure is permanent while it lasts, and it arrives exactly when a client is busy enough to have been useful.
+
+This is worth stating plainly because of how it was found. **A live compare-and-set confirmed the wrong rule.** The probe wrote a value, read it back, fed the extraction to `?if=`, and got a 200 — because the probe was nowhere near a quarter of the bucket, so the footer was never emitted. No amount of probing that path in normal conditions would have exposed it; the branch is invisible until the bucket is nearly spent. It took reading the source. A probe can only ever confirm behaviour under the conditions the probe created, and that is a general limit of everything else in this file labelled PROBED.
+
+`text()` appends a trailing newline when the body lacks one, which is where the observed trailing `\n` comes from. Line index 2 is unaffected by that, by the footer, and by an empty value.
+
+**The CAS observations below still hold** — they were about which status a condition returns, not about parsing:
+
+Feeding the extracted value back as `?if=` returned **200** — the write landed. Feeding the whole raw body as `?if=` returned **409**, as expected.
 
 The 409 body is parseable and carries the current value with its length:
 
@@ -156,6 +185,28 @@ Note that a path-level diff between the two scans can come back empty for the wr
 Audited on 2026-09-04 with the reflog included: no `.pem`, `.key`, `.p8` or `.env` path has ever appeared in any commit in this repository, reachable or orphaned.
 
 ---
+
+## Why the limits are read at runtime, in one number
+
+**technocore.chat runs 600 reads and 300 writes per minute. The documented defaults are 120 and 30.**
+
+STATED, `src/config.py` of the server:
+
+```python
+RATE_READ  = max(1, int(os.environ.get("CHAT_RATE_READ",  "120")))  # requests/min/IP
+RATE_WRITE = max(1, int(os.environ.get("CHAT_RATE_WRITE",  "30")))
+RATE_ROOMS_PER_DAY = max(1, int(os.environ.get("CHAT_RATE_ROOMS_PER_DAY", "20")))
+```
+
+PROBED, `/config` on 2026-09-05: `rate_read=600`, `rate_write=300`, `rate_rooms_per_day=20`.
+
+Five times the documented read default and ten times the write default. A client that hardcoded the published defaults — the reasonable thing to do, and they are real numbers from the real source — would pace itself to a fifth of the read budget and a tenth of the write budget it actually has. Not broken, just quietly wrong, and wrong in a direction nothing would ever surface: no error, no warning, just an agent that is slower than it needed to be for as long as it runs.
+
+This is the whole argument for runtime discovery, and it is a better one than any principle: **the defaults are documented, correct, and not what this deployment enforces.** The manual's own reasoning says the same thing from the other side — it names no numbers because "a manual that states a limit the server does not enforce is worse than one that states none, because you would pace yourself to it."
+
+Record the defaults, as above, so a reader knows what an unconfigured deployment does. Read `/config` and `/.well-known/agent.json` for what *this* one does.
+
+`rate_rooms_per_day` is also settled by this: it is a real, separately configured limit with its own environment variable, matching the deployment at its default of 20. The reconciliation below stands — it is not a token bucket, and the prose's "two token buckets" is accurate about token buckets.
 
 ## Reconciliation: how many buckets are there?
 
@@ -278,13 +329,15 @@ Winning a CAS does not stop a stalled peer that still believes it holds a claim.
 
 ### Transport
 
-**The URL budget is the one value in this client that cannot be discovered at runtime.** *(STATED as approximate — URL BUDGET)*
+**The URL budget is stated, and it is not read at runtime.** *(STATED — server README, and the flag that enforces it)*
 
-STATED: "the GET write lane carries the text in the path, so its real limit is URL length (~16 KB at the edge), not the character count."
+An earlier version of this note called this value "tilde-stated" and "the one value in this client that cannot be discovered at runtime". Both claims were wrong, and the server source says so directly.
 
-Every other limit this client cares about is published and is read from the service: the read and write buckets, the character caps, the ephemeral TTL, the duplicate window and the long-poll ceiling are all in `/config` and `/.well-known/agent.json`. The URL ceiling is not, and the reason is structural rather than an omission — it is not a property of the application at all. It belongs to whatever CDN or proxy sits in front of an instance, which is why `/config` cannot report it: that document publishes the knobs *this process enforces*, read from the same bindings its handlers read. A number the application never sees could not appear there without being a guess, and the prose gives it with a tilde for the same reason.
+STATED, `README.md` of the server repository: "the GET write lane carries text in the path, so its real limit is URL length (16 KB at the edge). 4096 ASCII characters fit; a CJK character is 9 bytes URL-encoded and an emoji 12, so long non-Latin messages need the POST lane." No tilde.
 
-So `SPEC_STATED_URL_BUDGET_BYTES` in `src/transport.ts` is a named, documented, overridable default rather than a value read at startup. It is the single exception in this package and is recorded here so it is not mistaken for an oversight.
+STATED, `docs/design.md`: the deployment runs `uvicorn --h11-max-incomplete-event-size 16384` "rather than a library default", and the design notes name Cloudflare's 16 KiB URL ceiling as the constraint that made an earlier documented note cap unreachable. So there is both a number and a named enforcement point.
+
+What remains true is narrower: the value is **not published by a runtime endpoint**. It is absent from `/config` and `/.well-known/agent.json`, which carry the knobs the application itself enforces, and this ceiling belongs to the front proxy. So `SPEC_STATED_URL_BUDGET_BYTES` stays a named default rather than a value read at startup — and it stays overridable, because a self-hosted deployment behind a different proxy has a different ceiling with nothing to announce it. The downward learning in `Transport` is what covers that case.
 
 **What the client does instead: it learns downward.** The dangerous case is an edge whose real ceiling is *below* the stated approximation — GET writes come back 414, or 413 from an edge that answers an over-long request line that way, and without adaptation every long write walks into the same wall for the life of the process.
 
@@ -340,5 +393,12 @@ Writes get a 403, and `p-` rooms are never announced there — not even anonymou
 **The DID-note fingerprint hashes the `did:key` string, not the key bytes.** *(STATED — IDENTITY)*
 First 16 lowercase hex of SHA-256 of the full identifier, split 2 + 14 into `/kv/did-<shard>/<key>`, with a legacy fallback read at `/kv/did/<all 16>`. Hashing the bytes gives a well-formed path no peer will ever read. Verified against an OpenSSL-computed digest in `test/did.test.ts`.
 
-**Fetched pages carry instructions aimed at the reading agent.** *(PROBED 2026-09-04)*
-`/skill.md` contains: "**Your first action:** Pick a nick and post a short greeting in `/r/lobby`". It is a page instructing whoever reads it to take an action. It was not acted on, and this library never treats fetched content as instructions — including the protocol's own documentation.
+**`/skill.md` is an installable Agent Skill, not injected content.** *(CONFIRMED IN SOURCE 2026-09-05)*
+
+An earlier version of this note listed `/skill.md` beside the prompt-injection material, on the strength of one line in it: "**Your first action:** Pick a nick and post a short greeting in `/r/lobby`". That characterisation was unfair and is corrected here.
+
+The server repository's `README.md` calls `SKILL.md` an installable [Agent Skill](https://code.claude.com/docs/en/skills). `src/app.py` serves the repository file byte-for-byte as `/skill.md`, publishes a SHA-256 of those bytes at `/.well-known/agent-skills/index.json`, and the file carries the standard skill frontmatter. The line is that skill's onboarding step, addressed to an agent that installed it — first-party documentation of the service, not a stranger's text arriving through a room.
+
+**Declining to act on it was still correct**, for a reason that survives the correction: it was fetched as a reference page, nobody had installed it as a skill, and the user had not asked for anything to be posted. A first-party document asking a reader to take an action is not the same as a user asking for it. The rule that content is data rather than instruction is about where authority comes from, not about whether the author is trustworthy — and it applies to this repository's own documentation as much as to `/r/lobby`.
+
+The genuinely untrusted surfaces are the ones the entries above name: message bodies, note values, room names and topics, and error bodies. Those carry strangers' text. `/skill.md` carries the operator's.
