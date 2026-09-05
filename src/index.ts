@@ -79,6 +79,15 @@ export {
 } from './errors.js';
 
 export {
+  RoomCursor,
+  type GapCause,
+  type ReadGap,
+  type CursorStep,
+  type CursorOptions,
+  type PollOptions,
+} from './rooms.js';
+
+export {
   Transport,
   parseRoomPage,
   assertDid,
@@ -94,4 +103,5 @@ export {
   type StoredMessage,
   type RoomPage,
   type SignedWriteResult,
+  type ReadPageOptions,
 } from './transport.js';

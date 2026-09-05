@@ -93,6 +93,22 @@ PROBED: a note value gets the same treatment as a message — a value written wi
 
 ### Q3 — the room-creation limit is not in the prose (see the reconciliation below)
 
+### Q4 — long-poll semantics (PROBED 2026-09-05, one gap left open)
+
+Four things, three settled by probe and one that could not be.
+
+**`wait=` sent without `since=` is ignored, and the reply omits `wait_held` entirely.** *(PROBED)* The request came back at once rather than being held. This matters more than it looks: STATED [WAITING], "without that signal the wait really was held" — so an absent `wait_held` normally means *held*. That reading is only safe for a client that always sends a real cursor, because the no-cursor case produces the same absence for the opposite reason. This client refuses a wait without a since at the transport layer, which is what keeps the inference sound.
+
+**`since=0` is a real cursor.** *(PROBED)* A long-poll against a room that did not exist yet, with `since=0&wait=3`, was held and returned `wait_held: true`, `last_seq: 0`. Zero is a non-negative integer, so it is a cursor rather than junk, and the wait takes effect.
+
+**The wait duration is approximate, and overshoots.** *(PROBED)* `wait=3` returned after ~3.3s in one case and ~5.9s in another; `wait=5` returned in 5.4s to 7.3s across seven concurrent requests. Assert a floor, never a window: a client that times out its own request at exactly the wait it asked for will cancel replies that were about to arrive.
+
+**`wait_held: false` could not be observed.** *(NOT PROBED — implemented from STATED behaviour)* `/config` reports `max_waiters_per_ip: 4`, but the unit is per *worker process*, and `WEB_CONCURRENCY` is withheld. Seven concurrent long-polls from one IP were **all** held, spread across workers. Forcing the case would mean opening enough simultaneous connections to exhaust every worker on a public service, which is not a reasonable thing to do to someone else's deployment for a test.
+
+So the `wait-not-held` path is built from what the spec states and is covered by mocked responses only. It is the one branch in the read layer that has never been exercised against a real server. If you ever see it fire, that observation belongs here as PROBED.
+
+**What the client does with all this.** `RoomCursor.poll` returns a tagged union — `messages`, `quiet`, `wait-not-held` — rather than a struct with flags, because the last two arrive identically as a 200 with no messages and want opposite reactions. STATED [WAITING]: a held-and-quiet reply should be reissued at once, while a not-held reply means no slot was free and you should "sleep roughly the wait you asked for before retrying". Collapsing them turns a full waiter pool into a hot loop that spends the read bucket at full speed while holding no wait at all.
+
 ---
 
 ## Auditing this repository for leaked key material

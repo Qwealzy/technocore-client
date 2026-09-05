@@ -128,6 +128,17 @@ export interface RoomPage {
   readonly waitHeld: boolean | null;
 }
 
+export interface ReadPageOptions {
+  /** Advisory. STATED: clamped to 1..200, junk falls back to 50, never refused. */
+  readonly limit?: number;
+  /** The cursor: return only messages with a greater seq. */
+  readonly since?: bigint;
+  /** Long-poll seconds. Requires `since`; refused without one. */
+  readonly waitSeconds?: number;
+  /** Throwaway value that varies the URL past a response cache. */
+  readonly cacheBuster?: number;
+}
+
 export interface SignedWriteResult {
   readonly lane: Lane;
   readonly did: string;
@@ -330,16 +341,39 @@ export class Transport {
   /**
    * Reads one page of a room.
    *
-   * Minimal on purpose: cursor semantics, gap detection and long-polling arrive
-   * with the reads increment. `limit` is advisory — STATED [PARAMETERS]: it is
-   * clamped and never refused, so read `count` off the reply rather than
-   * assuming the value you sent survived.
+   * `limit` is advisory. STATED [PARAMETERS]: it is clamped and never refused,
+   * so the count on the reply is the answer and the value you sent is not
+   * echoed back anywhere. Absent options are omitted rather than sent empty.
    */
-  async readRoomPage(room: string, options: { readonly limit?: number } = {}): Promise<RoomPage> {
+  async readRoomPage(room: string, options: ReadPageOptions = {}): Promise<RoomPage> {
     const name = roomName(room);
     const query = new URLSearchParams({ format: 'json' });
-    // An absent advisory parameter is omitted rather than sent empty.
+
     if (options.limit !== undefined) query.set('limit', String(options.limit));
+
+    // A cursor is carried as digits: STATED [EXPORT], a seq past 2^53 cannot
+    // survive a round trip through a JavaScript number.
+    if (options.since !== undefined) query.set('since', options.since.toString());
+
+    if (options.waitSeconds !== undefined) {
+      // STATED [WAITING]: wait is valid "only together with since=", and
+      // patterns.md says it "only takes effect together with a real since=".
+      // PROBED 2026-09-05: sent alone it is ignored, the reply comes back at
+      // once, and it carries no wait_held field at all. Sending it without a
+      // cursor spends a read and buys nothing, so it is refused here rather
+      // than quietly dropped.
+      if (options.since === undefined) {
+        throw new InvalidFieldError('wait', 'requires since; the server ignores it otherwise');
+      }
+      query.set('wait', String(options.waitSeconds));
+    }
+
+    // STATED [POLLING]: the URL changes as the room advances, "which defeats
+    // the response cache in most agent harnesses. If you must re-poll an
+    // unchanged URL, add a throwaway &n=<counter>." A quiet long-poll reissues
+    // the identical since, so the URL would not otherwise change.
+    if (options.cacheBuster !== undefined) query.set('n', String(options.cacheBuster));
+
     return this.#json(`${this.baseUrl}/r/${name}?${query.toString()}`);
   }
 

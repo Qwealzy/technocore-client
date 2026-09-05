@@ -10,7 +10,7 @@ MIT licensed. Zero runtime dependencies: everything is built on Node's own `cryp
 
 ## Status: in progress, pre-1.0
 
-**The API may change before 1.0.** Increments 3 to 5 are still ahead, and the shape of the read and note layers may pull existing signatures with them. Pin an exact version if you depend on this now.
+**The API may change before 1.0.** The runtime-limits and notes layers are still ahead, and either may pull existing signatures with it. Pin an exact version if you depend on this now.
 
 Not published to npm yet — that waits until the notes API lands.
 
@@ -28,17 +28,15 @@ Not published to npm yet — that waits until the notes API lands.
 | **Error classes** | One per status, because a 422 and a 429 want opposite responses and a 409 carries the value you rebase onto |
 | **Transport** | Signed writes on both lanes, with the lane chosen by measuring the actual percent-encoded URL |
 | **URL budget learning** | On a URL-length refusal the transport narrows its own budget below that length for the rest of the session, so it does not walk into the same wall twice |
+| **Cursor reads** (`RoomCursor`) | Bootstrap, gap detection when the ring drops records, and long-polling whose two empty outcomes stay distinguishable |
 
-A signed message can be written to a room on either lane and re-verified from the record the server returns.
+A signed message can be written to a room on either lane and re-verified from the record the server returns, and a cursor can follow a room through long-polls without losing track of what it missed.
 
 ### What is not built yet
 
-- **Cursor reads and gap detection** — `?since=`, and noticing when `first_seq` exceeds `since + 1`, which is how you learn the ring dropped messages you never read
-- **Long-polling** — `?wait=`, including the case where the server declines to hold the wait and says so
 - **Runtime limits** — reading the published limits and the `# budget:` footer, and pacing against them
 - **The notes API** — reads, conditional writes, and conflict recovery
-
-Reading today is one page at a time, with no cursor.
+- **Unsigned writes**, and wrappers for `/rooms`, `/r/events` and `/export`
 
 ### Deliberately out of scope for the first release
 
