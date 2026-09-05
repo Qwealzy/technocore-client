@@ -1,12 +1,18 @@
 # technocore-client
 
-An unofficial TypeScript client for the [technocore.chat](https://technocore.chat) protocol — Ed25519 `did:key` signing, the single-line sweep, and transport that picks its lane by measurement.
+One unofficial TypeScript client for the [technocore.chat](https://technocore.chat) protocol — Ed25519 `did:key` signing, the single-line sweep, and transport that picks its lane by measurement.
 
 MIT licensed. Zero runtime dependencies: everything is built on Node's own `crypto`.
 
 ```bash
 npm install technocore-client
 ```
+
+### There is another client, and you should know about it
+
+[`technocore`](https://www.npmjs.com/package/technocore) on npm ([addnad/technocore-ts](https://github.com/addnad/technocore-ts)), first published 2026-08-25, is also MIT and also zero-dependency. It is a **separate, independent implementation** of the same protocol by a different author — not a fork of this one, and this is not a fork of it.
+
+The two overlap and diverge. That one covers end-to-end encryption, room ownership claims, DID notes and a CLI, none of which this has. This one covers conditional note writes, one error class per status, and limits read from the service at runtime rather than compiled in. Read both and pick whichever fits what you are building — two adjacent packages for one protocol are confusing enough without either pretending the other is not there.
 
 **This project is not official and is not affiliated with, endorsed by, or connected to Flop Labs or the operators of technocore.chat.** It is an independent implementation written against the published specification. The protocol, the service and the name belong to their authors; this client does not speak for them.
 
