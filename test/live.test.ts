@@ -5,6 +5,7 @@ import { Identity } from '../src/identity.js';
 import { verifyStoredMessage } from '../src/verify.js';
 import { roomClasses } from '../src/names.js';
 import { RoomCursor } from '../src/rooms.js';
+import { discoverLimits, discoverConfig } from '../src/limits.js';
 
 /**
  * Live integration against a real deployment. Skipped unless TECHNOCORE_LIVE=1,
@@ -181,5 +182,34 @@ describe.skipIf(!live)('live: cursor reads and long-polling', () => {
     const page = await transport.readRoomPage(room, { limit: 2 });
     expect(page.count).toBe(page.messages.length);
     expect(page.count).toBeLessThanOrEqual(3);
+  });
+});
+
+describe.skipIf(!live)('live: limits are discovered, not assumed', () => {
+  it('reads what this deployment enforces, which is not the documented default', async () => {
+    // The reason limits.ts exists. The server's own config.py defaults are 120
+    // and 30; technocore.chat runs five and ten times that. Asserting only the
+    // relationship, not the numbers — a deployment may change either.
+    const limits = await discoverLimits();
+    expect(limits.readsPerMinutePerIp).toBeGreaterThan(0);
+    expect(limits.writesPerMinutePerIp).toBeGreaterThan(0);
+    expect(limits.source).toBe('agent.json');
+  });
+
+  it('agrees with /config, which publishes the same knobs by environment variable', async () => {
+    const [limits, config] = await Promise.all([discoverLimits(), discoverConfig()]);
+    expect(config.settings['rate_read']).toBe(limits.readsPerMinutePerIp);
+    expect(config.settings['rate_write']).toBe(limits.writesPerMinutePerIp);
+  });
+
+  it('learns nothing about the budget from a JSON room read, and says so', async () => {
+    // CONFIRMED IN SOURCE: respond() drops the footer for ?format=json. The
+    // tracker must report unknown rather than inferring a full bucket.
+    const transport = new Transport();
+    const identity = Identity.create();
+    const room = 'p-' + randomBytes(10).toString('hex');
+    await transport.sendSignedMessage(identity, room, nextNonce(), 'budget probe');
+    await transport.readRoomPage(room, { limit: 5 });
+    expect(transport.budget.read.state).toBe('unknown');
   });
 });

@@ -12,6 +12,7 @@ import { sweep } from './sweep.js';
 import { NONCE_PATTERN } from './payload.js';
 import { DID_KEY_PATTERN } from './did.js';
 import { SIGNATURE_PATTERN } from './encoding.js';
+import { BudgetTracker, type Bucket } from './limits.js';
 
 /**
  * HTTP, lane selection, and turning a response into the one error class whose
@@ -71,6 +72,13 @@ export interface TransportOptions {
   readonly fetch?: FetchLike;
   /** See SPEC_STATED_URL_BUDGET_BYTES. */
   readonly maxUrlBytes?: number;
+  /**
+   * Where budget observations are recorded. One is created if none is given.
+   *
+   * Share one across transports pointed at the same deployment: the buckets are
+   * per client IP, not per client object.
+   */
+  readonly budget?: BudgetTracker;
 }
 
 export type Lane = 'get' | 'post';
@@ -172,10 +180,18 @@ export class Transport {
   #smallestRejected: number | null = null;
   #largestAccepted: number | null = null;
 
+  /**
+   * STATED [LIMITS]: reads and writes are separate buckets, so this tracks them
+   * apart. Every reply this transport receives is fed in, including the ones
+   * that say nothing — which, on the JSON lane, is all of them.
+   */
+  readonly budget: BudgetTracker;
+
   constructor(options: TransportOptions = {}) {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.maxUrlBytes = options.maxUrlBytes ?? SPEC_STATED_URL_BUDGET_BYTES;
     this.#fetch = options.fetch ?? ((url, init) => fetch(url, init));
+    this.budget = options.budget ?? new BudgetTracker();
   }
 
   /**
@@ -395,6 +411,20 @@ export class Transport {
   ): Promise<RoomPage> {
     const response = await this.#fetch(url, init);
     const body = await response.text();
+
+    // A write is anything with a method, or a GET down the say/set lanes.
+    const bucket: Bucket = init?.method !== undefined || getLaneWriteBytes !== undefined ? 'write' : 'read';
+    // CONFIRMED IN SOURCE: respond() in src/app.py emits the budget footer only
+    // on the text lane — a ?format=json reply drops it. Everything this method
+    // sends asks for JSON, so an absent footer here means nothing at all rather
+    // than "above a quarter", and the tracker must not read it as the latter.
+    this.budget.observe({
+      status: response.status,
+      body,
+      bucket,
+      carriesFooter: false,
+      retryAfterHeader: response.headers?.get('retry-after') ?? null,
+    });
 
     if (getLaneWriteBytes !== undefined && isUrlLengthRefusal(response.status)) {
       // 414 is not in the specification at all, and 413 is described there only

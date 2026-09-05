@@ -79,6 +79,19 @@ export {
 } from './errors.js';
 
 export {
+  discoverLimits,
+  discoverConfig,
+  parseBudgetFooter,
+  parseRateLimitBody,
+  BudgetTracker,
+  PARKED_WAIT_READS,
+  BUDGET_FOOTER_FRACTION,
+  type Bucket,
+  type BudgetReading,
+  type PublishedLimits,
+} from './limits.js';
+
+export {
   RoomCursor,
   type GapCause,
   type ReadGap,

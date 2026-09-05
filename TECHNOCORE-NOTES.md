@@ -150,6 +150,48 @@ A page that came back **short of its limit** could not have been truncated, so a
 
 **One consequence for followers.** The maximum limit is 200, so a reader more than 200 messages behind cannot catch up through `?since=` at all: every read returns the newest slice and reports a gap. Falling that far behind means switching to `/export`, or accepting the loss. Keeping up is not merely more efficient; past a point it is the only thing that works.
 
+### Q6 — where the budget footer attaches (CONFIRMED IN SOURCE 2026-09-05)
+
+The footer is built by `budget_note()` in `src/limit.py` and returns the empty string above a quarter of the bucket. Where it lands is decided by `respond()` in `src/app.py`, which **emits it only on the text lane** — a `?format=json` reply returns `json.dumps(view)` and drops the `note` argument entirely.
+
+| Endpoint | Footer |
+| --- | --- |
+| Room read, long-poll, writes — `?format=json` | **No.** `respond()` drops it |
+| Room read, long-poll, writes — text lane | Yes, appended after the rendered body |
+| Long-poll, text lane | Yes, after the `# wait: not held` line, which is deliberately ahead of it |
+| Note read `/kv/<ns>/<key>` — **no JSON lane exists** | **Yes, after the value.** The one place it can corrupt a payload |
+| Note list `/kv/<ns>` — text lane | Yes |
+| `/export` | **No.** A `StreamingResponse` with no note, keeping the clean-file promise |
+| 429 | Not a footer. `limited()` builds a dedicated body |
+
+**Two consequences for this client.**
+
+It asks for JSON everywhere it can, so it will **never** see a budget footer on a room read. The only replies that can carry one are note reads and note listings, and the only other budget signal it gets is a 429 body. That is why `BudgetReading` separates `unknown` from `above-quarter`: on the JSON lane an absent footer is not evidence of a full bucket, it is the absence of a place to put the number.
+
+And the note-read case is the one that bites, which is Q2 above: the footer lands *after* the value, so any extraction that takes "everything after the blank line" silently appends it — but only once the caller is below a quarter of the read bucket.
+
+The 429 body is now known exactly rather than parsed heuristically:
+
+```
+429 rate limited: the {read|write} budget for your IP ({per_min}/min) is spent.
+retry after: {wait}s — the bucket refills continuously ({rate}), so waiting longer buys a bigger burst, up to {per_min}.
+```
+
+`wait = max(1, round(retry_after))` is computed once and put in both the body and `Retry-After`, so the two cannot disagree — the body is preferred because STATED [LIMITS], harnesses show the body and not headers.
+
+### Q5b — the long-poll wait overshoots its request (PROBED 2026-09-05)
+
+The server holds a `wait=` request for **at least** the seconds requested, and observably longer:
+
+| Requested | Observed |
+| --- | --- |
+| `wait=3` | 3.3s, and 5.9s on a room that did not exist yet |
+| `wait=5` | 5.4s, 5.4s, 5.4s, 5.5s, 5.7s, 7.3s, 7.3s (seven concurrent) |
+
+`/config` gives `wait_poll: 0.5` — the wake latency, the interval at which a parked request re-checks — which accounts for part of it; the rest is request latency and scheduling. STATED [WAITING] promises only that the reply comes "as soon as a message lands", up to the ceiling.
+
+**Assert a floor, never a window.** A client that times out its own request at exactly the wait it asked for will cancel replies that were about to arrive, and will do it more often under load. The live test in this repository asserts `elapsed > 2000` for a `wait=3`, deliberately not an upper bound.
+
 ### Q4 — long-poll semantics (PROBED 2026-09-05, one gap left open)
 
 Four things, three settled by probe and one that could not be.
