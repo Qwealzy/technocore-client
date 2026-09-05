@@ -400,6 +400,80 @@ export class Transport {
   }
 
   /**
+   * A request whose reply is text/plain, which is the only lane notes have.
+   *
+   * CONFIRMED IN SOURCE: `note_read` in `src/app.py` returns
+   * `text(f"{BANNER}
+
+{value}" + budget_note(...))` and never consults
+   * `format`, so `?format=json` on a single note read is silently ignored and
+   * the reply stays text/plain. Parsing it as JSON would fail on every note.
+   *
+   * Unlike the JSON lane, this one CAN carry a budget footer, so the tracker is
+   * told so: an absent footer here really does mean the bucket is above a
+   * quarter, rather than meaning nothing at all.
+   */
+  async requestText(
+    url: string,
+    init?: Parameters<FetchLike>[1],
+    options: { readonly bucket?: Bucket; readonly getLaneWriteBytes?: number } = {},
+  ): Promise<{ readonly status: number; readonly body: string; readonly contentType: string }> {
+    const response = await this.#fetch(url, init);
+    const body = await response.text();
+    const bucket: Bucket =
+      options.bucket ?? (init?.method !== undefined || options.getLaneWriteBytes !== undefined ? 'write' : 'read');
+
+    this.budget.observe({
+      status: response.status,
+      body,
+      bucket,
+      carriesFooter: true,
+      retryAfterHeader: response.headers?.get('retry-after') ?? null,
+    });
+
+    if (options.getLaneWriteBytes !== undefined && isUrlLengthRefusal(response.status)) {
+      this.#recordRejected(options.getLaneWriteBytes);
+      throw new UrlTooLongError(
+        response.status,
+        body,
+        url,
+        options.getLaneWriteBytes,
+        this.#effectiveMaxUrlBytes(),
+      );
+    }
+
+    if (response.status === 400 && options.getLaneWriteBytes !== undefined) {
+      throw new BadFieldError(
+        body,
+        url,
+        this.#mayBeEdgeRejection(body, options.getLaneWriteBytes),
+        options.getLaneWriteBytes,
+      );
+    }
+
+    if (response.status !== 200) {
+      throw errorForResponse(response.status, body, url, response.headers);
+    }
+
+    if (options.getLaneWriteBytes !== undefined) this.#recordAccepted(options.getLaneWriteBytes);
+
+    return {
+      status: response.status,
+      body,
+      contentType: response.headers?.get('content-type') ?? '',
+    };
+  }
+
+  /** Measures a note-write URL the same way a message write is measured. */
+  noteSetUrl(namespace: string, key: string, sweptValue: string, query = ''): string {
+    return `${this.baseUrl}/kv/${namespace}/${key}/set/${encodeURIComponent(sweptValue)}${query}`;
+  }
+
+  decideLane(url: string): LaneDecision {
+    return this.#decide(url);
+  }
+
+  /**
    * @param getLaneWriteBytes set only for a write sent down the GET lane; it is
    * the measured URL length, and it is what makes a length refusal
    * distinguishable from the protocol's own 413.

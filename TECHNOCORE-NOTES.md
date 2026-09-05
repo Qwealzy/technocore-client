@@ -120,6 +120,8 @@ The 400 also confirms the documented error shape: the first line names the offen
 
 PROBED: a note value gets the same treatment as a message — a value written with leading and trailing U+00A0 was stored as the bare letter.
 
+**An empty `?if=` confirmed live (PROBED 2026-09-05).** A note holding `not empty` was written again with `?if=` and nothing after it. The write was **refused with a 409**, which is only possible if the server read it as a condition against the empty string. Had it been treated as "no condition", the write would have landed. This closes the one part of Q2 that had been reasoned from the openapi description rather than observed, and it is the behaviour the tagged union in `src/notes.ts` exists to preserve: a single optional string cannot distinguish "compare against empty" from "do not compare".
+
 ### Q3 — the room-creation limit is not in the prose (see the reconciliation below)
 
 ### Q5 — `limit` truncates from the front, so a gap does not prove loss (PROBED 2026-09-05)

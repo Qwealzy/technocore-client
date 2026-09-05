@@ -6,6 +6,8 @@ import { verifyStoredMessage } from '../src/verify.js';
 import { roomClasses } from '../src/names.js';
 import { RoomCursor } from '../src/rooms.js';
 import { discoverLimits, discoverConfig } from '../src/limits.js';
+import { Notes } from '../src/notes.js';
+import { ConflictError } from '../src/errors.js';
 
 /**
  * Live integration against a real deployment. Skipped unless TECHNOCORE_LIVE=1,
@@ -211,5 +213,82 @@ describe.skipIf(!live)('live: limits are discovered, not assumed', () => {
     await transport.sendSignedMessage(identity, room, nextNonce(), 'budget probe');
     await transport.readRoomPage(room, { limit: 5 });
     expect(transport.budget.read.state).toBe('unknown');
+  });
+});
+
+describe.skipIf(!live)('live: notes round-trip and compare-and-set', () => {
+  const transport = new Transport();
+  const notes = new Notes(transport);
+
+  it('writes, reads back the exact value, and wins a CAS with it', async () => {
+    const ns = 'p-' + randomBytes(10).toString('hex');
+
+    expect(await notes.get(ns, 'state')).toBeNull();
+
+    await notes.set(ns, 'state', 'step 4 done', { kind: 'ifAbsent' });
+
+    const read = await notes.get(ns, 'state');
+    expect(read?.value).toBe('step 4 done');
+    // The banner really is served, and the value really is line index 2.
+    expect(read?.banner.startsWith('!!')).toBe(true);
+    expect(read?.raw.split('\n')[2]).toBe('step 4 done');
+
+    // The extraction is correct if and only if this write lands.
+    const ack = await notes.set(ns, 'state', 'step 5 done', {
+      kind: 'ifValue',
+      value: read?.value as string,
+    });
+    expect(ack.bytes).toBe('step 5 done'.length);
+
+    expect((await notes.get(ns, 'state'))?.value).toBe('step 5 done');
+  });
+
+  it('loses a CAS against a stale value and rebases from the 409 body', async () => {
+    const ns = 'p-' + randomBytes(10).toString('hex');
+    await notes.set(ns, 'state', 'first', { kind: 'ifAbsent' });
+
+    let caught: unknown;
+    try {
+      await notes.set(ns, 'state', 'never lands', { kind: 'ifValue', value: 'stale' });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ConflictError);
+    const conflict = caught as ConflictError;
+    expect(conflict.currentValue).toBe('first');
+    expect(conflict.statedLength).toBe('first'.length);
+
+    // Rebasing on the body alone, with no extra read.
+    const ack = await notes.set(ns, 'state', 'second', {
+      kind: 'ifValue',
+      value: conflict.currentValue as string,
+    });
+    expect(ack.bytes).toBe('second'.length);
+  });
+
+  it('treats if_absent on an existing note as a lost race, not a bad request', async () => {
+    const ns = 'p-' + randomBytes(10).toString('hex');
+    await notes.set(ns, 'state', 'taken', { kind: 'ifAbsent' });
+    await expect(
+      notes.set(ns, 'state', 'mine', { kind: 'ifAbsent' }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('treats an empty if= as a condition against the empty string', async () => {
+    const ns = 'p-' + randomBytes(10).toString('hex');
+    await notes.set(ns, 'state', 'not empty', { kind: 'ifAbsent' });
+    // The note holds 'not empty', so a CAS against '' must lose rather than
+    // being read as "no condition".
+    await expect(
+      notes.set(ns, 'state', 'x', { kind: 'ifValue', value: '' }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('lists what it wrote', async () => {
+    const ns = 'p-' + randomBytes(10).toString('hex');
+    await notes.set(ns, 'alpha', 'a');
+    await notes.set(ns, 'beta', 'b');
+    const keys = await notes.list(ns);
+    expect([...keys].sort()).toEqual(['alpha', 'beta']);
   });
 });

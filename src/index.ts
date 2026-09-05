@@ -79,6 +79,14 @@ export {
 } from './errors.js';
 
 export {
+  Notes,
+  parseNoteBody,
+  type NoteCondition,
+  type NoteRead,
+  type NoteWriteAck,
+} from './notes.js';
+
+export {
   discoverLimits,
   discoverConfig,
   parseBudgetFooter,
