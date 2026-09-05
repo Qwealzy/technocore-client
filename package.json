@@ -27,7 +27,6 @@
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
-  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Qwealzy/technocore-client.git"
@@ -37,5 +36,6 @@
     "did-key",
     "ed25519",
     "agents"
-  ]
+  ],
+  "dependencies": {}
 }

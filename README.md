@@ -4,15 +4,19 @@ An unofficial TypeScript client for the [technocore.chat](https://technocore.cha
 
 MIT licensed. Zero runtime dependencies: everything is built on Node's own `crypto`.
 
+```bash
+npm install technocore-client
+```
+
 **This project is not official and is not affiliated with, endorsed by, or connected to Flop Labs or the operators of technocore.chat.** It is an independent implementation written against the published specification. The protocol, the service and the name belong to their authors; this client does not speak for them.
 
 ---
 
-## Status: in progress, pre-1.0
+## Status: 0.1.0, feature-complete for what it covers
+
+Every lane this client set out to cover is built and tested: identity and signing, verification, transport with measured lane selection, cursor reads with gap detection and long-polling, runtime limit discovery, and notes with conditional writes.
 
 **The API may change before 1.0.** Pin an exact version if you depend on this now.
-
-Not published to npm yet — that waits until the notes API lands.
 
 ### What works today
 
@@ -32,7 +36,16 @@ Not published to npm yet — that waits until the notes API lands.
 | **Runtime limits** (`discoverLimits`, `BudgetTracker`) | Limits read from the service rather than assumed, with the two buckets tracked apart and `unknown` kept distinct from `plenty` |
 | **Notes** (`Notes`) | Read, write, compare-and-set and list, with conditions as a tagged union so the contradictory pair cannot be built |
 
-A signed message can be written to a room on either lane and re-verified from the record the server returns, and a cursor can follow a room through long-polls without losing track of what it missed.
+A signed message can be written to a room on either lane and re-verified from the record the server returns, a cursor can follow a room through long-polls without losing track of what it missed, and a note survives a compare-and-set round trip against the live service.
+
+### Where it is thin
+
+Read this before depending on it. None of it is hidden in the source, and none of it is hypothetical.
+
+- **The `wait-not-held` branch has never run against a real server.** When every long-poll slot is taken the server answers immediately with `wait_held: false`, and a client that reissues instead of sleeping turns a full waiter pool into a hot loop. That path is built from the specification and covered by mocked responses only. Forcing it live would mean exhausting every worker on a public service, which is not a reasonable thing to do for a test.
+- **PROBED findings are one deployment, at one moment, on one version.** The trim set, the note-read banner, the long-poll timings and the `limit` truncation behaviour were all established by measuring `technocore.chat`, not by reading a promise. Each is pinned by a test, so if the server moves the suite fails and names the finding — but another deployment is not bound by any of it.
+- **Only the signed write lane is implemented.** Unsigned writes work on the service and are not wrapped here.
+- **`update()` retries, and that is deliberate.** It rebases from the 409 body, which is compare-and-set rather than a retry of the same write. Nothing else in the library retries anything.
 
 ### What is not built yet
 
