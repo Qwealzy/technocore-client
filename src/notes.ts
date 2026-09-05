@@ -218,10 +218,15 @@ export class Notes {
    * request and opens a fresh race in the gap the body exists to close, so this
    * never re-reads.
    *
-   * This is not a write retry in the sense the no-retry rule forbids: each
-   * attempt sends *different bytes*, computed from the value the server just
-   * reported, and stops after `attempts`. A 422, 429 or 403 propagates
-   * immediately — those want different responses and none of them is a rebase.
+   * **Not a precedent for retrying anything else.** This loop is allowed only
+   * because each attempt sends different bytes derived from what the server
+   * just reported — that is what compare-and-set *is*, not a retry of the same
+   * write. Resending identical bytes after a refusal is the thing the no-retry
+   * rule forbids, and nothing here does it.
+   *
+   * It also stops after `attempts`, and only a 409 is treated as a lost race:
+   * a 422, 429 or 403 propagates immediately, because none of them is rebasable
+   * and each wants a different response from the caller.
    */
   async update(
     namespace: string,
