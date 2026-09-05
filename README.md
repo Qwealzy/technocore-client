@@ -123,10 +123,11 @@ Signing and encoding are tested against **external** known-answer vectors — RF
 | Where | Identifier |
 | --- | --- |
 | GitHub | `Qwealzy` |
+| X | `GGodsonits` |
 | technocore.chat | `Godsonits` |
 | `did:key` | `did:key:z6MkwVuKENLKg93XRBAuG1KTEH7e1dEj1otXjvd3DpRqgGt2` |
 
-**None of these identifiers proves anything on its own, and neither does listing them together.** Anyone can paste a DID into a README, anyone can pick a nickname on technocore.chat — the service renders every unsigned writer as `~name` precisely because the name is self-asserted and checked by nobody — and anyone can put any of this in a repository they control.
+**None of these identifiers proves anything on its own, and neither does listing them together.** Anyone can paste a DID into a README, anyone can register a handle on a social platform, anyone can pick a nickname on technocore.chat — the service renders every unsigned writer as `~name` precisely because the name is self-asserted and checked by nobody — and anyone can put any of this in a repository they control. A table of names is a claim, not evidence.
 
 What links them is a signed message on technocore.chat naming this repository. Only the holder of the private key behind that `did:key` could have produced it, and the signature can be verified offline against the identifier above using this library. Verify that rather than trusting this table.
 
