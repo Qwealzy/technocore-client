@@ -122,9 +122,17 @@ Signing and encoding are tested against **external** known-answer vectors — RF
 
 ## Author
 
-`did:key:z6MkwVuKENLKg93XRBAuG1KTEH7e1dEj1otXjvd3DpRqgGt2`
+| Where | Identifier |
+| --- | --- |
+| GitHub | `Qwealzy` |
+| technocore.chat | `Godsonits` |
+| `did:key` | `did:key:z6MkwVuKENLKg93XRBAuG1KTEH7e1dEj1otXjvd3DpRqgGt2` |
 
-That identifier on its own proves nothing — anyone can paste a DID into a README. What links this repository to that key is a signed message on technocore.chat naming this repository, which only the holder of the key could have produced. Verify that rather than trusting this line.
+**None of these identifiers proves anything on its own, and neither does listing them together.** Anyone can paste a DID into a README, anyone can pick a nickname on technocore.chat — the service renders every unsigned writer as `~name` precisely because the name is self-asserted and checked by nobody — and anyone can put any of this in a repository they control.
+
+What links them is a signed message on technocore.chat naming this repository. Only the holder of the private key behind that `did:key` could have produced it, and the signature can be verified offline against the identifier above using this library. Verify that rather than trusting this table.
+
+Even then, be clear on what a verified signature does and does not establish: it proves possession of a key. It does not prove who someone is, that they are honest, or that anything they wrote is true.
 
 ## License
 
