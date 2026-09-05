@@ -30,21 +30,53 @@ import { InvalidFieldError } from './errors.js';
  * expiry can happen to a reader that was keeping up perfectly.
  */
 export type GapCause =
-  /** A plain room: the only mechanism that drops readable records is the ring. */
+  /**
+   * The ring dropped the records. STATED [RETENTION]: old messages are dropped
+   * past the room's byte budget. Always possible, so always listed.
+   */
   | 'ring-overflow'
-  /** An `e-` room: the ring, the TTL, or both. The response cannot distinguish them. */
-  | 'ring-overflow-or-ttl-expiry';
+  /**
+   * An `e-` room's TTL stopped returning them. STATED [EPHEMERAL].
+   * Listed only for rooms whose class makes it possible.
+   */
+  | 'ttl-expiry'
+  /**
+   * The page was truncated from the front by `limit`.
+   *
+   * PROBED 2026-09-05: `limit` returns the NEWEST n messages after the cursor,
+   * not the next n in order. With `since` far behind, `first_seq` came back as
+   * `last_seq - limit + 1` at every limit tried, while the records in between
+   * were still present in the room's export. So a full page with a gap does
+   * not prove anything was lost — only that this response could not carry it.
+   */
+  | 'page-truncated';
 
 export interface ReadGap {
   /** The cursor that was sent. */
   readonly since: bigint;
   /** The oldest seq that came back. */
   readonly firstSeq: bigint;
-  /** How many seq values fall in the hole. Some may never have been readable. */
+  /** How many seq values fall in the hole. */
   readonly missing: bigint;
-  readonly cause: GapCause;
-  /** True when the cause is ambiguous and cannot be resolved from the response. */
+  /**
+   * Every cause the response is consistent with, narrowest evidence first.
+   *
+   * Always contains at least `ring-overflow`. More than one entry means the
+   * response cannot tell you which, and the entries have different recoveries:
+   * a truncated page can be re-read, ring overflow may still be recoverable
+   * from `/export`, and TTL expiry is final.
+   */
+  readonly possibleCauses: readonly GapCause[];
+  /** True when more than one cause is possible. */
   readonly ambiguous: boolean;
+  /**
+   * The page came back exactly as full as the limit allowed.
+   *
+   * Null when no limit was sent, because the default is a protocol constant
+   * this client does not assume — with no limit sent, truncation cannot be
+   * ruled out either.
+   */
+  readonly pageWasFull: boolean | null;
 }
 
 /**
@@ -117,16 +149,34 @@ export interface PollOptions {
   readonly waitSeconds?: number;
 }
 
-function detectGap(page: RoomPage, since: bigint, ephemeral: boolean): ReadGap | null {
+function detectGap(
+  page: RoomPage,
+  since: bigint,
+  ephemeral: boolean,
+  requestedLimit: number | undefined,
+): ReadGap | null {
   if (page.firstSeq === null) return null;
   // STATED [RETENTION]: first_seq greater than since + 1 means missed lines.
   if (page.firstSeq <= since + 1n) return null;
+
+  // PROBED 2026-09-05: a full page is the signature of front-truncation, since
+  // `limit` yields the newest n after the cursor rather than the next n. A page
+  // that came back short of its limit could not have been truncated, so a gap
+  // there is genuine loss.
+  const pageWasFull = requestedLimit === undefined ? null : page.count >= requestedLimit;
+
+  const possibleCauses: GapCause[] = [];
+  if (pageWasFull !== false) possibleCauses.push('page-truncated');
+  possibleCauses.push('ring-overflow');
+  if (ephemeral) possibleCauses.push('ttl-expiry');
+
   return {
     since,
     firstSeq: page.firstSeq,
     missing: page.firstSeq - (since + 1n),
-    cause: ephemeral ? 'ring-overflow-or-ttl-expiry' : 'ring-overflow',
-    ambiguous: ephemeral,
+    possibleCauses,
+    ambiguous: possibleCauses.length > 1,
+    pageWasFull,
   };
 }
 
@@ -230,7 +280,9 @@ export class RoomCursor {
       return { kind: 'quiet', lastSeq: this.#lastSeq, generation: page.generation, page };
     }
 
-    const gap = generationChanged ? null : detectGap(page, since, this.ephemeral);
+    const gap = generationChanged
+      ? null
+      : detectGap(page, since, this.ephemeral, options.limit);
     this.#lastSeq = page.lastSeq;
 
     return {

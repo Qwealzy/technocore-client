@@ -93,6 +93,34 @@ PROBED: a note value gets the same treatment as a message — a value written wi
 
 ### Q3 — the room-creation limit is not in the prose (see the reconciliation below)
 
+### Q5 — `limit` truncates from the front, so a gap does not prove loss (PROBED 2026-09-05)
+
+**`limit` returns the newest N messages after your cursor, not the next N in order.** Measured against `/r/technocore` with a cursor roughly 24,000 messages behind:
+
+| Request | count | first_seq | last_seq |
+| --- | --- | --- | --- |
+| `?since=4602317` (no limit) | 50 | 4627090 | 4627139 |
+| `?since=4602317&limit=50` | 50 | 4627093 | 4627142 |
+| `?since=4602317&limit=200` | 200 | 4626943 | 4627142 |
+
+In every case `first_seq = last_seq - count + 1`, and `last_seq` is the room's newest. The page is cut from the **front**.
+
+**Consequence: `first_seq > since + 1` does not, on its own, mean the ring dropped anything.** STATED [RETENTION] says "If a reply reports first_seq greater than your since+1, you missed lines", and that is true of *the response* — but it is not the same claim as "those records are gone". Confirmed directly: seq 4602318 was absent from every `since=` read above, and present in the room's export the whole time, whose range was 4593354..4626940.
+
+This was found because the client's own gap detection reported ~24,000 lost messages for a record that was sitting in the export. An earlier version of this library would have told a caller their history was gone when it was not.
+
+**What the client does now.** `ReadGap.possibleCauses` lists every cause the response is consistent with, because their recoveries differ:
+
+| Cause | Recovery |
+| --- | --- |
+| `page-truncated` | Read again; the records are still served |
+| `ring-overflow` | Gone from reads, but `/export` may still hold them |
+| `ttl-expiry` | Final; `e-` rooms only |
+
+A page that came back **short of its limit** could not have been truncated, so a gap there is genuine loss and `possibleCauses` narrows to the ring. A page that came back **full** cannot distinguish the two. With no limit sent there is nothing to compare the count against, so truncation stays on the list — the fallback page size is a protocol constant this client does not assume.
+
+**One consequence for followers.** The maximum limit is 200, so a reader more than 200 messages behind cannot catch up through `?since=` at all: every read returns the newest slice and reports a gap. Falling that far behind means switching to `/export`, or accepting the loss. Keeping up is not merely more efficient; past a point it is the only thing that works.
+
 ### Q4 — long-poll semantics (PROBED 2026-09-05, one gap left open)
 
 Four things, three settled by probe and one that could not be.

@@ -169,7 +169,7 @@ describe('gap detection', () => {
     ]);
     const transport = new Transport({ fetch: mock.fn });
     const { cursor } = await RoomCursor.open(transport, 'p-test');
-    const step = await cursor.poll();
+    const step = await cursor.poll({ limit: 50 });
     if (step.kind !== 'messages') throw new Error('expected messages');
     expect(step.gap).not.toBeNull();
     expect(step.gap?.since).toBe(10n);
@@ -212,10 +212,13 @@ describe('gap detection', () => {
     ]);
     const transport = new Transport({ fetch: mock.fn });
     const { cursor } = await RoomCursor.open(transport, 'lobby');
-    const step = await cursor.poll();
+    const step = await cursor.poll({ limit: 50 });
     if (step.kind !== 'messages') throw new Error('expected messages');
-    expect(step.gap?.cause).toBe('ring-overflow');
+    // The page came back short of its limit, so truncation is ruled out and
+    // the ring is the only remaining explanation.
+    expect(step.gap?.possibleCauses).toEqual(['ring-overflow']);
     expect(step.gap?.ambiguous).toBe(false);
+    expect(step.gap?.pageWasFull).toBe(false);
   });
 
   it('states the ambiguity in an e- room', async () => {
@@ -229,9 +232,9 @@ describe('gap detection', () => {
     const transport = new Transport({ fetch: mock.fn });
     const { cursor } = await RoomCursor.open(transport, 'e-p-abc');
     expect(cursor.ephemeral).toBe(true);
-    const step = await cursor.poll();
+    const step = await cursor.poll({ limit: 50 });
     if (step.kind !== 'messages') throw new Error('expected messages');
-    expect(step.gap?.cause).toBe('ring-overflow-or-ttl-expiry');
+    expect(step.gap?.possibleCauses).toEqual(['ring-overflow', 'ttl-expiry']);
     expect(step.gap?.ambiguous).toBe(true);
   });
 
@@ -396,5 +399,62 @@ describe('follow cannot become an unthrottled request loop', () => {
     const elapsed = Date.now() - started;
     expect(elapsed).toBeGreaterThanOrEqual(60);
     expect(elapsed).toBeLessThan(4000);
+  });
+});
+
+describe('a full page cannot prove the ring dropped anything', () => {
+  // PROBED 2026-09-05 against /r/technocore: with the cursor far behind,
+  // since=4602317 returned first_seq = last_seq - limit + 1 at every limit
+  // tried (50, then 200), while the records in between were still present in
+  // the room's export. limit yields the NEWEST n after the cursor, not the
+  // next n, so a full page with a gap says only that this response could not
+  // carry the middle.
+  it('lists truncation alongside overflow when the page came back full', async () => {
+    const mock = scripted([
+      { body: page({ last_seq: 10, first_seq: 10, messages: [message(10)] }) },
+      {
+        body: page({
+          last_seq: 1000,
+          first_seq: 999,
+          messages: [message(999), message(1000)],
+          count: 2,
+        }),
+      },
+    ]);
+    const transport = new Transport({ fetch: mock.fn });
+    const { cursor } = await RoomCursor.open(transport, 'p-test');
+    const step = await cursor.poll({ limit: 2 });
+    if (step.kind !== 'messages') throw new Error('expected messages');
+    expect(step.gap?.pageWasFull).toBe(true);
+    expect(step.gap?.possibleCauses).toContain('page-truncated');
+    expect(step.gap?.possibleCauses).toContain('ring-overflow');
+    expect(step.gap?.ambiguous).toBe(true);
+  });
+
+  it('cannot rule truncation out when no limit was sent', async () => {
+    // The fallback limit is a protocol constant this client does not assume,
+    // so with nothing sent there is no page size to compare the count against.
+    const mock = scripted([
+      { body: page({ last_seq: 10, first_seq: 10, messages: [message(10)] }) },
+      { body: page({ last_seq: 90, first_seq: 80, messages: [message(80)], count: 1 }) },
+    ]);
+    const transport = new Transport({ fetch: mock.fn });
+    const { cursor } = await RoomCursor.open(transport, 'p-test');
+    const step = await cursor.poll();
+    if (step.kind !== 'messages') throw new Error('expected messages');
+    expect(step.gap?.pageWasFull).toBeNull();
+    expect(step.gap?.possibleCauses).toContain('page-truncated');
+  });
+
+  it('always lists ring-overflow, which is never excluded by evidence', async () => {
+    const mock = scripted([
+      { body: page({ last_seq: 1, first_seq: 1, messages: [message(1)] }) },
+      { body: page({ last_seq: 50, first_seq: 40, messages: [message(40)], count: 1 }) },
+    ]);
+    const transport = new Transport({ fetch: mock.fn });
+    const { cursor } = await RoomCursor.open(transport, 'e-p-abc');
+    const step = await cursor.poll({ limit: 10 });
+    if (step.kind !== 'messages') throw new Error('expected messages');
+    expect(step.gap?.possibleCauses).toEqual(['ring-overflow', 'ttl-expiry']);
   });
 });

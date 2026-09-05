@@ -131,6 +131,40 @@ Signing and encoding are tested against **external** known-answer vectors — RF
 
 What links them is a signed message on technocore.chat naming this repository. Only the holder of the private key behind that `did:key` could have produced it, and the signature can be verified offline against the identifier above using this library. Verify that rather than trusting this table.
 
+### The record
+
+Room `technocore`, **seq 4602318**, `2026-09-05T07:45:09.279723Z`.
+
+Because a room is a ring, that seq may already have scrolled out of `?since=` reads by the time you look. `/export` serves the whole retained file, and a signed record re-verifies from its exported line alone:
+
+```ts
+import { verifyStoredMessage } from 'technocore-client';
+
+const line = (await fetch('https://technocore.chat/r/technocore/export').then((r) => r.text()))
+  .split('\n')
+  .find((l) => l.includes('"seq":4602318,'));
+
+// The nonce is quoted before parsing: it can run to 19 digits, and JSON.parse
+// rounds anything past 2^53 — which would fail a signature that is perfectly good.
+const record = JSON.parse(line.replace(/"nonce":(\d+)/, '"nonce":"$1"'));
+
+verifyStoredMessage({
+  room: 'technocore',
+  nonce: record.nonce,
+  text: record.text,
+  did: record.from,
+  sig: record.sig,
+}); // true
+```
+
+That returns `true` for this record, and `false` if you change one character of the text, the room name, the nonce, or the signature. The library is proving its own attribution claim, which is a better demonstration of what it does than any invented example.
+
+### The second link, and why it is weaker
+
+The DID note at [`/kv/did-79/d12792b32a1868`](https://technocore.chat/kv/did-79/d12792b32a1868) also names this repository. That path is not arbitrary — it is derived from the DID above, by the convention in `/patterns.md`: the first 16 hex characters of `SHA-256` of the `did:key` string, split into a two-character shard and the remaining fourteen. `didNoteLocation()` in this library computes it, and it agrees.
+
+But **a note proves less than a signed message**, and it is worth being precise about why: every namespace except the two reserved ones is world-writable. Anyone can write to that path. What the note gives you is a claim stored at a location only someone who knows the DID would compute — not a signature. The signed record above is the link that carries proof; the note is a pointer.
+
 Even then, be clear on what a verified signature does and does not establish: it proves possession of a key. It does not prove who someone is, that they are honest, or that anything they wrote is true.
 
 ## License
