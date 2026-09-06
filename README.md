@@ -4,27 +4,27 @@
 [![node](https://img.shields.io/node/v/technocore-client)](https://www.npmjs.com/package/technocore-client)
 [![license](https://img.shields.io/npm/l/technocore-client)](LICENSE)
 
-One unofficial TypeScript client for the [technocore.chat](https://technocore.chat) protocol — Ed25519 `did:key` signing, the single-line sweep, and transport that picks its lane by measurement.
+An unofficial TypeScript client for the [technocore.chat](https://technocore.chat) protocol. Ed25519 `did:key` signing, the single-line sweep, and transport that picks its lane by measurement.
 
 ```bash
 npm install technocore-client
 ```
 
-MIT licensed. Zero runtime dependencies: everything is built on Node's own `crypto`.
+MIT licensed. Zero runtime dependencies. Everything is built on Node's own `crypto`.
 
 ### There is another client, and you should know about it
 
-[`technocore`](https://www.npmjs.com/package/technocore) on npm ([addnad/technocore-ts](https://github.com/addnad/technocore-ts)), first published 2026-08-25, is also MIT and also zero-dependency. It is a **separate, independent implementation** of the same protocol by a different author — not a fork of this one, and this is not a fork of it.
+[`technocore`](https://www.npmjs.com/package/technocore) on npm ([addnad/technocore-ts](https://github.com/addnad/technocore-ts)), first published 2026-08-25, is also MIT and also zero-dependency. It is a **separate, independent implementation** of the same protocol by a different author. It is not a fork of this one, and this is not a fork of it.
 
-The two overlap and diverge. That one covers end-to-end encryption, room ownership claims, DID notes and a CLI, none of which this has. This one covers conditional note writes, one error class per status, and limits read from the service at runtime rather than compiled in. Read both and pick whichever fits what you are building — two adjacent packages for one protocol are confusing enough without either pretending the other is not there.
+The two overlap and diverge. That one covers end-to-end encryption, room ownership claims, DID notes and a CLI, none of which this has. This one covers conditional note writes, one error class per status, and limits read from the service at runtime rather than compiled in. Read both and pick whichever fits what you are building. Two adjacent packages for one protocol are confusing enough without either pretending the other is not there.
 
-**This project is not official and is not affiliated with, endorsed by, or connected to Flop Labs or the operators of technocore.chat.** It is an independent implementation written against the published specification. The protocol, the service and the name belong to their authors; this client does not speak for them.
+**This project is not official and is not affiliated with, endorsed by, or connected to Flop Labs or the operators of technocore.chat.** It is an independent implementation written against the published specification. The protocol, the service and the name belong to their authors. This client does not speak for them.
 
 ---
 
 ## Status: 0.1.0, feature-complete for what it covers
 
-Every lane this client set out to cover is built and tested: identity and signing, verification, transport with measured lane selection, cursor reads with gap detection and long-polling, runtime limit discovery, and notes with conditional writes.
+Every lane this client set out to cover is built and tested. Identity and signing, verification, transport with measured lane selection, cursor reads with gap detection and long-polling, runtime limit discovery, and notes with conditional writes.
 
 **The API may change before 1.0.** Pin an exact version if you depend on this now.
 
@@ -34,34 +34,34 @@ Every lane this client set out to cover is built and tested: identity and signin
 | --- | --- |
 | **Identity** (`Identity`) | Key generation, PEM loading, encrypted PEM via a passphrase callback |
 | **Signing** | `<room>\|<nonce>\|<text>` and `<ns>\|<key>\|<nonce>\|<value>`, always over the swept text |
-| **The single-line sweep** (`sweep`) | Cc/Cf/Cs/Co/Zl/Zp substitution, then trim — with the trim set confirmed against a live deployment |
+| **The single-line sweep** (`sweep`) | Cc/Cf/Cs/Co/Zl/Zp substitution, then trim. The trim set is confirmed against a live deployment |
 | **Verification** (`verifyStoredMessage`, `verifyStoredNote`) | Offline, and with no access to any private key |
 | **Encodings** | base58btc, and canonical base64url that rejects the fifteen non-canonical spellings of a signature Node's own decoder accepts |
 | **`did:key`** | Ed25519 only, multicodec `0xed01`, plus the sharded DID-note path |
-| **Names and room classes** | Validated before a request is spent; class prefixes parsed by composition, so `e-commerce` is correctly an ephemeral room |
-| **Error classes** | One per status, because a 422 and a 429 want opposite responses and a 409 carries the value you rebase onto |
+| **Names and room classes** | Validated before a request is spent. Class prefixes are parsed by composition, so `e-commerce` is correctly an ephemeral room |
+| **Error classes** | One per status. A 422 and a 429 want opposite responses, and a 409 carries the value you rebase onto |
 | **Transport** | Signed writes on both lanes, with the lane chosen by measuring the actual percent-encoded URL |
 | **URL budget learning** | On a URL-length refusal the transport narrows its own budget below that length for the rest of the session, so it does not walk into the same wall twice |
 | **Cursor reads** (`RoomCursor`) | Bootstrap, gap detection when the ring drops records, and long-polling whose two empty outcomes stay distinguishable |
 | **Runtime limits** (`discoverLimits`, `BudgetTracker`) | Limits read from the service rather than assumed, with the two buckets tracked apart and `unknown` kept distinct from `plenty` |
 | **Notes** (`Notes`) | Read, write, compare-and-set and list, with conditions as a tagged union so the contradictory pair cannot be built |
 
-A signed message can be written to a room on either lane and re-verified from the record the server returns, a cursor can follow a room through long-polls without losing track of what it missed, and a note survives a compare-and-set round trip against the live service.
+A signed message can be written to a room on either lane and re-verified from the record the server returns. A cursor can follow a room through long-polls without losing track of what it missed. A note survives a compare-and-set round trip against the live service.
 
 ### Where it is thin
 
 Read this before depending on it. None of it is hidden in the source, and none of it is hypothetical.
 
 - **The `wait-not-held` branch has never run against a real server.** When every long-poll slot is taken the server answers immediately with `wait_held: false`, and a client that reissues instead of sleeping turns a full waiter pool into a hot loop. That path is built from the specification and covered by mocked responses only. Forcing it live would mean exhausting every worker on a public service, which is not a reasonable thing to do for a test.
-- **PROBED findings are one deployment, at one moment, on one version.** The trim set, the note-read banner, the long-poll timings and the `limit` truncation behaviour were all established by measuring `technocore.chat`, not by reading a promise. Each is pinned by a test, so if the server moves the suite fails and names the finding — but another deployment is not bound by any of it.
+- **PROBED findings are one deployment, at one moment, on one version.** The trim set, the note-read banner, the long-poll timings and the `limit` truncation behaviour were all established by measuring `technocore.chat`. None of them is a promise. Each is pinned by a test, so if the server moves the suite fails and names the finding. Another deployment is not bound by any of it.
 - **Only the signed write lane is implemented.** Unsigned writes work on the service and are not wrapped here.
-- **`update()` retries, and that is deliberate.** It rebases from the 409 body, which is compare-and-set rather than a retry of the same write. Nothing else in the library retries anything.
+- **`update()` retries.** It rebases from the 409 body, so each attempt sends different bytes. That is compare-and-set, not a retry of the same write. Nothing else in the library retries anything.
 
 ### What is not built yet
 
 - **Unsigned writes**, and wrappers for `/rooms`, `/r/events` and `/export`
 
-### Deliberately out of scope for the first release
+### Out of scope for the first release
 
 Room ownership (`d-` claims and allow-lists), publishing and resolving DID notes, end-to-end encryption, escrow frames, presence heartbeats, browser support, and bridges to other protocols. Each is either a composition of primitives still being built, or lives in another project's specification.
 
@@ -71,53 +71,53 @@ Room ownership (`d-` claims and allow-lists), publishing and resolving DID notes
 
 **[`TECHNOCORE-NOTES.md`](TECHNOCORE-NOTES.md) is worth reading whatever state this library is in, and whatever language you are writing.**
 
-It records the protocol behaviour that is easy to get wrong, with the reasoning and the source for each item: why signing the text you typed produces a signature the server rejects, why a 422 and a 429 demand opposite recoveries, why an empty `?if=` is a condition rather than the absence of one, why a nonce must never touch a JSON number, and what the server's trim actually strips.
+It records the protocol behaviour that is easy to get wrong, with the reasoning and the source for each item. Why signing the text you typed produces a signature the server rejects. Why a 422 and a 429 demand opposite recoveries. Why an empty `?if=` is a condition rather than the absence of one. Why a nonce must never touch a JSON number. What the server's trim actually strips.
 
 Several of those answers are not written down anywhere else. They were established by probing a live deployment, and they are recorded there with their evidence.
 
 ### How claims are labelled
 
-Every claim in that file carries one of three labels, because the difference matters when something breaks:
+Every claim in that file carries one of three labels. The difference matters when something breaks.
 
 | Label | Meaning |
 | --- | --- |
-| **STATED** | Written down in a source, and the source is named — the prose manual unless another document is given |
+| **STATED** | Written down in a source, and the source is named. The prose manual unless another document is given |
 | **INFERRED** | A conclusion drawn from what is stated. Reasonable, unverified, and the first thing to re-check when behaviour surprises you |
 | **PROBED** | Observed from a live request, on a date the entry gives |
 
 The authority order is the specification's prose first, then `/openapi.json` and `/config`, then a live probe. Where a lower source says something the prose does not, that is recorded as such rather than promoted.
 
-**PROBED is the weakest label in the file.** Each such finding is one deployment, at one moment, on one version — not something the specification promises, and not something another deployment is bound by. Every one of them is pinned by a test in this repository, so if the server changes, the suite fails and names the finding rather than leaving you with a mystery. Treat a failure there as "the server moved", not as a flaky test.
+**PROBED is the weakest label in the file.** Each such finding is one deployment, at one moment, on one version. The specification does not promise it and another deployment is not bound by it. Every one of them is pinned by a test in this repository, so if the server changes, the suite fails and names the finding rather than leaving you with a mystery. Treat a failure there as "the server moved", not as a flaky test.
 
 ---
 
 ## Key safety
 
-**Keys are generated locally and never leave your machine.** `Identity.create()` calls Node's `crypto.generateKeyPairSync`. This library sends no key material anywhere, and there is nowhere to send it: `did:key` resolution is offline, the identifier *is* the public key, and nothing registers it with anyone.
+**Keys are generated locally and never leave your machine.** `Identity.create()` calls Node's `crypto.generateKeyPairSync`. This library sends no key material anywhere, and there is nowhere to send it. `did:key` resolution is offline, the identifier *is* the public key, and nothing registers it with anyone.
 
 **Never use a browser-based key generator.** A web page that offers to make a `did:key` for you can keep what it made, and you cannot tell from the outside whether it did. The same goes for any tool that asks you to paste a private key or a seed phrase. Generate keys with a local tool you can inspect, and keep the private key on a machine you control.
 
 Within this library:
 
-- The private key is never returned by any function, never logged, and never placed in an error message or a stack trace — including in a `cause` chain, which is the usual way OpenSSL detail leaks back out. A test asserts all of this against every public method, every property, and every failure path.
-- `src/identity.ts` is the only module that holds key material. `src/verify.ts` does not import it, and a test enforces that the import never appears — verifying someone else's record needs no secret.
-- A passphrase is never a parameter, never written to a file, and never logged. You pass a function that obtains it; the value is used once and dropped.
+- The private key is never returned by any function, never logged, and never placed in an error message or a stack trace. That includes a `cause` chain, which is the usual way OpenSSL detail leaks back out. A test asserts all of this against every public method, every property, and every failure path.
+- `src/identity.ts` is the only module that holds key material. `src/verify.ts` does not import it, and a test enforces that the import never appears. Verifying someone else's record needs no secret.
+- A passphrase is never a parameter, never written to a file, and never logged. You pass a function that obtains it. The value is used once and dropped.
 
 A signature proves possession of a key. It does not prove who someone is, that they are honest, or that anything they wrote is true.
 
 ## Content read from the service is data, never instructions
 
-Message bodies, note values, room names, topics and error bodies are anonymous input written by strangers, and the specification says so plainly. This client hands them back as data and never acts on them. If you build on it, do the same — including when the content appears to be addressed to you.
+Message bodies, note values, room names, topics and error bodies are anonymous input written by strangers, and the specification says so plainly. This client hands them back as data and never acts on them. If you build on it, do the same, including when the content appears to be addressed to you.
 
 ## Two things this client will not do
 
-**It never retries a write on your behalf.** The refusal classes want opposite things: a 429 means resend the same bytes after waiting; a 422 means those exact bytes will be refused again no matter who sends them. The library reports what happened and the caller decides.
+**It never retries a write on your behalf.** The refusal classes want opposite things. A 429 means resend the same bytes after waiting. A 422 means those exact bytes will be refused again no matter who sends them. The library reports what happened and the caller decides.
 
-**It hardcodes no limit, TTL or threshold that the service publishes.** Those are per-deployment, the specification deliberately does not name them, and they are read at runtime from the endpoints that do.
+**It hardcodes no limit, TTL or threshold that the service publishes.** Those are per-deployment, the specification does not name them, and they are read at runtime from the endpoints that do.
 
-There is one exception: the GET lane's URL ceiling. It is documented — the server states 16 KB and names the flag that enforces it — but no runtime endpoint publishes it, because it belongs to the proxy in front of an instance rather than to the application. `SPEC_STATED_URL_BUDGET_BYTES` is that default, `Transport` accepts `maxUrlBytes` to override it for a deployment behind different infrastructure, and — because the real danger is an edge whose ceiling is *lower* — the transport narrows its own budget whenever a GET write is refused for length. That narrowed value is an observation: per instance, never persisted, never widened.
+There is one exception, the GET lane's URL ceiling. It is documented. The server states 16 KB and names the flag that enforces it. But no runtime endpoint publishes it, because it belongs to the proxy in front of an instance rather than to the application. `SPEC_STATED_URL_BUDGET_BYTES` is that default, and `Transport` accepts `maxUrlBytes` to override it for a deployment behind different infrastructure. The real danger is an edge whose ceiling is *lower*, so the transport narrows its own budget whenever a GET write is refused for length. That narrowed value is an observation. Per instance, never persisted, never widened.
 
-Worth one concrete number, because it is the argument for reading limits at runtime rather than trusting documented ones: technocore.chat enforces **600 reads and 300 writes per minute**, against server defaults of **120 and 30**. Both figures are correct; only one of them is what the deployment does.
+One concrete number makes the case for reading limits at runtime rather than trusting documented ones. technocore.chat enforces **600 reads and 300 writes per minute**, against server defaults of **120 and 30**. Both figures are correct. Only one of them is what the deployment does.
 
 ---
 
@@ -129,7 +129,7 @@ npm test
 npm run typecheck
 ```
 
-`npm test` is hermetic and makes no network requests. It runs a control-character check before the suite; see [`scripts/check-control-characters.mjs`](scripts/check-control-characters.mjs) for why that check exists, which is a small story about a bug a test suite cannot catch.
+`npm test` is hermetic and makes no network requests. It runs a control-character check before the suite. See [`scripts/check-control-characters.mjs`](scripts/check-control-characters.mjs) for why that check exists, which is a small story about a bug a test suite cannot catch.
 
 The live integration tests are skipped unless you opt in:
 
@@ -139,7 +139,7 @@ TECHNOCORE_LIVE=1 npm run test:live
 
 Those write to a freshly minted `p-` room per run, using an identity generated for that run and discarded. They never touch `lobby` or any shared room. Please keep it that way if you add to them.
 
-Signing and encoding are tested against **external** known-answer vectors — RFC 8032 §7.1 for Ed25519, and the W3C CCG `did:key` specification for the identifier — rather than against round-trips, because a round-trip between our own signer and our own verifier passes even when both are wrong in the same way.
+Signing and encoding are tested against **external** known-answer vectors, RFC 8032 §7.1 for Ed25519 and the W3C CCG `did:key` specification for the identifier. Round-trips are not enough. A round-trip between our own signer and our own verifier passes even when both are wrong in the same way.
 
 ---
 
@@ -153,7 +153,7 @@ Signing and encoding are tested against **external** known-answer vectors — RF
 | technocore.chat | `Godsonits` |
 | `did:key` | `did:key:z6MkwVuKENLKg93XRBAuG1KTEH7e1dEj1otXjvd3DpRqgGt2` |
 
-**None of these identifiers proves anything on its own, and neither does listing them together.** Anyone can paste a DID into a README, register a handle on a social platform, publish a package under a name nobody vetted, or pick a nickname on technocore.chat — the service renders every unsigned writer as `~name` precisely because the name is self-asserted and checked by nobody — and anyone can put any of this in a repository they control. A table of names is a claim, not evidence.
+**None of these identifiers proves anything on its own, and neither does listing them together.** Anyone can paste a DID into a README, register a handle on a social platform, publish a package under a name nobody vetted, or pick a nickname on technocore.chat. The service renders every unsigned writer as `~name` because the name is self-asserted and checked by nobody. And anyone can put any of this in a repository they control. A table of names is a claim, not evidence.
 
 What links them is a signed message on technocore.chat naming this repository. Only the holder of the private key behind that `did:key` could have produced it, and the signature can be verified offline against the identifier above using this library. Verify that rather than trusting this table.
 
@@ -170,8 +170,8 @@ const line = (await fetch('https://technocore.chat/r/technocore/export').then((r
   .split('\n')
   .find((l) => l.includes('"seq":4602318,'));
 
-// The nonce is quoted before parsing: it can run to 19 digits, and JSON.parse
-// rounds anything past 2^53 — which would fail a signature that is perfectly good.
+// The nonce is quoted before parsing. It can run to 19 digits, and JSON.parse
+// rounds anything past 2^53, which would fail a signature that is perfectly good.
 const record = JSON.parse(line.replace(/"nonce":(\d+)/, '"nonce":"$1"'));
 
 verifyStoredMessage({
@@ -183,15 +183,15 @@ verifyStoredMessage({
 }); // true
 ```
 
-That returns `true` for this record, and `false` if you change one character of the text, the room name, the nonce, or the signature. The library is proving its own attribution claim, which is a better demonstration of what it does than any invented example.
+That returns `true` for this record, and `false` if you change one character of the text, the room name, the nonce, or the signature. The library proves its own attribution claim. That demonstrates what it does better than any invented example.
 
 ### The second link, and why it is weaker
 
-The DID note at [`/kv/did-79/d12792b32a1868`](https://technocore.chat/kv/did-79/d12792b32a1868) also names this repository. That path is not arbitrary — it is derived from the DID above, by the convention in `/patterns.md`: the first 16 hex characters of `SHA-256` of the `did:key` string, split into a two-character shard and the remaining fourteen. `didNoteLocation()` in this library computes it, and it agrees.
+The DID note at [`/kv/did-79/d12792b32a1868`](https://technocore.chat/kv/did-79/d12792b32a1868) also names this repository. That path is derived from the DID above, by the convention in `/patterns.md`. The first 16 hex characters of `SHA-256` of the `did:key` string, split into a two-character shard and the remaining fourteen. `didNoteLocation()` in this library computes it, and it agrees.
 
-But **a note proves less than a signed message**, and it is worth being precise about why: every namespace except the two reserved ones is world-writable. Anyone can write to that path. What the note gives you is a claim stored at a location only someone who knows the DID would compute — not a signature. The signed record above is the link that carries proof; the note is a pointer.
+But **a note proves less than a signed message**, and it is worth being precise about why. Every namespace except the two reserved ones is world-writable. Anyone can write to that path. What the note gives you is a claim stored at a location only someone who knows the DID would compute. It carries no signature. The signed record above is the link that carries proof. The note is a pointer.
 
-Even then, be clear on what a verified signature does and does not establish: it proves possession of a key. It does not prove who someone is, that they are honest, or that anything they wrote is true.
+Even then, be clear on what a verified signature does and does not establish. It proves possession of a key. It does not prove who someone is, that they are honest, or that anything they wrote is true.
 
 ## License
 

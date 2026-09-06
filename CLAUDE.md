@@ -1,14 +1,14 @@
 # Technocore (technocore.chat)
 
-## Security — no exceptions
+## Security, no exceptions
 - NEVER read, cat, copy, or display the contents of identity.pem.
   Check only that it exists, with `test -f`.
 - A password/passphrase is never a command argument, is never written
   to a file, is never logged. Interactive stdin only.
 - The private key is never returned from any function and never
   appears in an error message.
-- Before every commit, verify that identity.pem is in .gitignore —
-  every single time.
+- Before every commit, verify that identity.pem is in .gitignore.
+  Every single time.
 
 ## Context
 - Protocol reference: https://technocore.chat (single page, full spec)
@@ -47,6 +47,23 @@
   in your own p- scratch room, not in lobby.
 - Writes are NOT retried automatically. Different error classes demand
   different responses; the library reports, the caller decides.
+
+## Writing style for anything public
+Applies to README files, docs, commit messages, PR bodies, and code
+comments. Anything that ends up in a public repository.
+
+- No em-dashes. Use a comma, a full stop, or restructure the sentence.
+- No "not X, but Y" constructions.
+- No colon-then-reveal sentences.
+- Short, direct sentences. Break long ones instead of joining clauses.
+- Drop stock phrases: "worth noting", "the point is", "deliberately",
+  "and that is the point", "which is the property you want".
+- Fewer rhetorical flourishes. State the thing and move on.
+- Plain vocabulary where it works.
+
+This is style only. It does not change content. Keep every caveat, every
+limitation, every security note, the no-signing gate, and the "unsigned"
+and "structure only" headers. Those are substance.
 
 ## Scope
 - No token distribution, airdrop, or eligibility claim appears in the
