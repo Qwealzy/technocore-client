@@ -6,8 +6,8 @@ import { storedMessagePayload, storedNotePayload } from './payload.js';
 /**
  * Offline verification of a stored record.
  *
- * This module deliberately does NOT import identity.ts and holds no private key
- * material of any kind. STATED [SIGNING / auth.md]: "resolution is offline —
+ * This module does NOT import identity.ts and holds no private key material
+ * of any kind. STATED [SIGNING / auth.md]: "resolution is offline —
  * the identifier is the key", so verifying somebody else's message needs their
  * did:key, the record, and nothing else. Keeping the import graph one-way is
  * what makes that checkable rather than merely claimed.
@@ -57,7 +57,7 @@ export function verifyPayload(payload: string, signature: string, did: string): 
 export interface StoredMessage {
   readonly room: string;
   readonly nonce: string;
-  /** The text as stored — already swept by the server. Do not sweep it again. */
+  /** The text as stored, already swept by the server. Do not sweep it again. */
   readonly text: string;
   readonly did: string;
   readonly sig: string;
@@ -65,7 +65,7 @@ export interface StoredMessage {
 
 /**
  * STATED [RENDERING]: a record with no `sig` is "not re-verifiable", NOT
- * invalid — records written before the field existed simply do not have one.
+ * invalid. Records written before the field existed simply do not have one.
  * That distinction belongs to the caller, so this function takes a `sig` and
  * the caller decides what a missing one means.
  *
@@ -86,7 +86,7 @@ export interface StoredNote {
   readonly namespace: string;
   readonly key: string;
   readonly nonce: string;
-  /** The value as stored — already swept by the server. */
+  /** The value as stored, already swept by the server. */
   readonly value: string;
   readonly did: string;
   readonly sig: string;

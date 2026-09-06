@@ -7,20 +7,20 @@
  *
  * Three things about that sentence do the damage, and each is a separate bug if
  * you get it wrong:
- *   1. REPLACED, not deleted. "a\u0000b" stores as "a b" — three characters.
+ *   1. REPLACED, not deleted. "a\u0000b" stores as "a b", three characters.
  *   2. No run collapsing. Two swept characters become two spaces, not one.
  *   3. Trim happens AFTER substitution, so a text of only sweepable characters
  *      collapses to spaces and then to the empty string.
  *
  * STATED [SIGNING]: the signature covers the text after this runs. Sweep before
- * signing, never after — see payload.ts, which is the only supported way to
+ * signing, never after. See payload.ts, which is the only supported way to
  * build a signable string precisely so this cannot be skipped.
  */
 
 /**
- * Zs (ordinary spaces such as U+00A0) is deliberately NOT in this class: the
- * spec lists Cc, Cf, Cs, Co, Zl and Zp, and nothing else. Adding a category
- * here would produce bytes the server never stores.
+ * Zs (ordinary spaces such as U+00A0) is NOT in this class. The spec lists
+ * Cc, Cf, Cs, Co, Zl and Zp, and nothing else. Adding a category here would
+ * produce bytes the server never stores.
  */
 const SWEEPABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Zl}\p{Zp}]/gu;
 

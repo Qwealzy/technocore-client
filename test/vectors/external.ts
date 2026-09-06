@@ -60,7 +60,7 @@ export const RFC8032_ED25519: readonly Rfc8032Vector[] = [
  * shares no code with src/encoding.ts. Both directions agreed.
  *
  * The spec's own RENDERING section abbreviates a verified writer as
- * `<z6Mk...2doK>` — the head and tail of this same identifier.
+ * `<z6Mk...2doK>`, the head and tail of this same identifier.
  */
 export const W3C_DID_KEY_ED25519 = {
   did: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',

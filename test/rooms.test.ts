@@ -223,7 +223,7 @@ describe('gap detection', () => {
 
   it('states the ambiguity in an e- room', async () => {
     // STATED [EPHEMERAL]: records past the TTL stop being returned while seq
-    // keeps counting, so a gap there may be expiry rather than overflow — and
+    // keeps counting, so a gap there may be expiry rather than overflow, and
     // the response cannot say which.
     const mock = scripted([
       { body: page({ last_seq: 5, first_seq: 5, messages: [message(5)] }) },

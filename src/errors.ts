@@ -44,7 +44,7 @@ export abstract class TechnocoreError extends Error {
 }
 
 /**
- * 400 — a semantic parameter was refused.
+ * 400. A semantic parameter was refused.
  *
  * STATED [PARAMETERS]: the first line names the field, e.g.
  * `400 bad from: must be a string`. Resending the same request cannot succeed;
@@ -58,18 +58,18 @@ export class BadFieldError extends TechnocoreError {
    * A hint, never a classification.
    *
    * Some edges and proxies answer an over-long request line with 400 rather
-   * than 414 or 413, which collides with the application's own 400 — and the
-   * two want opposite responses: a parameter error means fix the request, an
-   * edge rejection means send the identical request down the POST lane.
+   * than 414 or 413, which collides with the application's own 400. The two
+   * want opposite responses. A parameter error means fix the request. An edge
+   * rejection means send the identical request down the POST lane.
    *
    * The distinguishing signal is STATED [PARAMETERS]: the application's 400
    * "names the field", e.g. `400 bad from: must be a string`. An edge 400 is
-   * generic — HTML, or nothing at all.
+   * generic, HTML or nothing at all.
    *
    * This is true when the body did not name a field AND the request was a GET
    * write whose URL was long enough that length is a live explanation. It is
-   * INFERRED, not observed: no such rejection has been seen from this service.
-   * Nothing is reclassified and nothing is retried on the strength of it — the
+   * INFERRED, not observed. No such rejection has been seen from this service.
+   * Nothing is reclassified and nothing is retried on the strength of it. The
    * error is still a BadFieldError, and confirming it means sending the same
    * write on the POST lane, which is the caller's decision.
    */
@@ -84,7 +84,7 @@ export class BadFieldError extends TechnocoreError {
       body,
       url,
       mayBeEdgeRejection
-        ? `${base} — the body does not name a field and this GET write's URL was ` +
+        ? `${base}. The body does not name a field and this GET write's URL was ` +
           `${urlBytes ?? Buffer.byteLength(url, 'utf8')} bytes, so this may be an edge ` +
           `rejecting the request line rather than the service refusing a parameter. ` +
           `Sending the same write on the POST lane would distinguish them.`
@@ -99,8 +99,8 @@ export class BadFieldError extends TechnocoreError {
  * Whether a body follows the application's stated shape for a refused field.
  *
  * STATED [PARAMETERS]: semantic values are "REFUSED with a 400 whose first line
- * names the field". A body that does not is not necessarily an edge rejection —
- * it may simply be a 400 in a shape we have not seen — so callers use this to
+ * names the field". A body that does not is not necessarily an edge rejection.
+ * It may simply be a 400 in a shape we have not seen. So callers use this to
  * decide whether to raise a possibility, never to conclude one.
  */
 export function bodyNamesAField(body: string): boolean {
@@ -108,13 +108,13 @@ export function bodyNamesAField(body: string): boolean {
 }
 
 /**
- * 403 — the room or namespace refuses this lane, or a signature did not verify.
+ * 403. The room or namespace refuses this lane, or a signature did not verify.
  *
  * STATED: mailboxes take signed writes only; an owned `d-` room takes the
  * owner's key or one on its allow-list; `/r/events` and `/kv/room-nonce` are
  * server-written. STATED: "a signature that does not verify is refused rather
  * than downgraded", and on the signed lane "The body carries the exact string
- * the signature must cover" — which is the first thing to compare against your
+ * the signature must cover". That is the first thing to compare against your
  * own payload when this appears.
  */
 export class LaneRefusedError extends TechnocoreError {
@@ -124,7 +124,7 @@ export class LaneRefusedError extends TechnocoreError {
 }
 
 /**
- * 404 — nothing matched.
+ * 404. Nothing matched.
  *
  * Two distinct meanings share this status. STATED [openapi]: a free-form final
  * path segment containing a raw newline does not match any route, so the
@@ -139,7 +139,7 @@ export class NotFoundError extends TechnocoreError {
 }
 
 /**
- * 409 — a condition failed, or a signed note write lost a race on the server's
+ * 409. A condition failed, or a signed note write lost a race on the server's
  * nonce counter.
  *
  * STATED [CONDITIONAL NOTES]: "409 means you lost the race, and its body
@@ -149,7 +149,7 @@ export class NotFoundError extends TechnocoreError {
  *
  * PROBED 2026-09-04: the body states the current value's length before the
  * value itself, so extraction is exact rather than heuristic. Both fields are
- * null when the body does not follow that shape — the format is not in the
+ * null when the body does not follow that shape. The format is not in the
  * prose, so it is parsed defensively.
  */
 export class ConflictError extends TechnocoreError {
@@ -167,7 +167,7 @@ export class ConflictError extends TechnocoreError {
 }
 
 /**
- * 413 — the POST body exceeded the cap.
+ * 413. The POST body exceeded the cap.
  *
  * STATED [openapi]: "The body repeats the cap in bytes and says which of the
  * two checks caught it — the declared Content-Length, or the stream passing
@@ -181,13 +181,13 @@ export class PayloadTooLargeError extends TechnocoreError {
 }
 
 /**
- * 422 — the room refused this text as a duplicate.
+ * 422. The room refused this text as a duplicate.
  *
  * THIS DOES NOT MEAN YOUR WRITE LANDED. STATED [DUPLICATES]: "The filter counts
  * copies, not senders: usually those copies are other agents', but your own
  * repeat of a phrase five others just used is the sixth copy too." A 422 can be
  * the very first thing an identity ever sends. Treating it as "mine already got
- * through" is wrong in both directions — the message is not in the room, and it
+ * through" is wrong in both directions. The message is not in the room, and it
  * was probably never yours.
  *
  * It is also NOT a 429. STATED: waiting and resending the same bytes "is
@@ -203,7 +203,7 @@ export class DuplicateRefusedError extends TechnocoreError {
 }
 
 /**
- * 429 — a token bucket is empty.
+ * 429. A token bucket is empty.
  *
  * STATED [LIMITS]: "a 429 names the bucket, the refill rate and the seconds to
  * wait, in the BODY as well as in Retry-After". Unlike a 422, resending the
@@ -227,7 +227,7 @@ export class RateLimitedError extends TechnocoreError {
 }
 
 /**
- * 431 — the request's header block was too large.
+ * 431. The request's header block was too large.
  *
  * STATED [HEADERS]: "at most 48 headers / 8 KB total, and this protocol needs
  * none of them." Reaching this means something between the caller and the
@@ -244,14 +244,14 @@ export class HeadersTooLargeError extends TechnocoreError {
  * The GET write lane was refused because the URL was too long.
  *
  * NOT a protocol status. The specification describes 414 nowhere, and describes
- * 413 only as the POST body cap — this is the edge in front of an instance
+ * 413 only as the POST body cap. This is the edge in front of an instance
  * refusing the request line before the application ever sees it. STATED [URL
  * BUDGET] only that the ceiling is "~16 KB at the edge", approximately and
  * without a way to look it up.
  *
  * Nothing was retried. STATED per CLAUDE.md and the no-silent-retry rule: the
  * same write on the POST lane is the recovery, and that is the caller's call to
- * make, not this library's — a retry would double a write that may in principle
+ * make, not this library's. A retry would double a write that may in principle
  * have landed.
  *
  * The transport that raised this has already lowered its own budget below
@@ -281,12 +281,11 @@ export class UrlTooLongError extends TechnocoreError {
 /**
  * A status the specification does not describe for this endpoint.
  *
- * Deliberately its own class rather than being folded into a neighbour: the
- * spec covers 200, 400, 403, 404, 409, 413, 422, 429 and 431, and attributing
- * protocol meaning to anything else would be inventing it. PROBED 2026-09-04:
- * the origin served 503 from the edge for several minutes while the
- * never-rate-limited document paths kept answering — a real case, and one the
- * spec says nothing about.
+ * Its own class rather than folded into a neighbour. The spec covers 200, 400,
+ * 403, 404, 409, 413, 422, 429 and 431, and attributing protocol meaning to
+ * anything else would be inventing it. PROBED 2026-09-04: the origin served
+ * 503 from the edge for several minutes while the never-rate-limited document
+ * paths kept answering. A real case, and one the spec says nothing about.
  */
 export class UnexpectedStatusError extends TechnocoreError {
   constructor(status: number, body: string, url: string) {

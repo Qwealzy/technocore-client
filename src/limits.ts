@@ -7,10 +7,10 @@ import { InvalidFieldError } from './errors.js';
  *
  * technocore.chat enforces 600 reads and 300 writes per minute. The server's
  * own documented defaults are 120 and 30. Both numbers are correct, and only
- * one of them is what the deployment does — so a client that hardcoded the
+ * one of them is what the deployment does. A client that hardcoded the
  * published defaults, which is the reasonable thing to do, would pace itself to
  * a fifth of its read budget and a tenth of its write budget. Nothing would say
- * so: no error, no warning, no slow path. Just an agent quieter than it needed
+ * so. No error, no warning, no slow path. Just an agent quieter than it needed
  * to be for as long as it runs.
  *
  * That is the whole argument, and it is stronger than the principle. STATED
@@ -18,7 +18,7 @@ import { InvalidFieldError } from './errors.js';
  * numbers because "a manual that states a limit the server does not enforce is
  * worse than one that states none, because you would pace yourself to it."
  *
- * STATED [LIMITS]: the documents are never rate limited — `/`, `/llms.txt`,
+ * STATED [LIMITS]: the documents are never rate limited. `/`, `/llms.txt`,
  * `/skill.md`, `/patterns.md`, `/interop.md`, `/auth.md`, `/openapi.json`,
  * `/config`, `/.well-known/*` and `/healthz`. Discovery therefore works while
  * you are throttled, which is exactly when you need it.
@@ -33,7 +33,7 @@ export type Bucket = 'read' | 'write';
  * The distinction this type exists for: **an absent budget footer is not a full
  * bucket.** STATED [LIMITS], the footer appears only "once you drop below a
  * quarter of the bucket", so its absence carries information only when the
- * response was one that could have carried it — and none at all otherwise.
+ * response was one that could have carried it, and none at all otherwise.
  *
  * Collapsing `unknown` into `aboveQuarter` would let a client conclude it has
  * room on the strength of a reply that never had anywhere to put the number.
@@ -44,7 +44,7 @@ export type BudgetReading =
        * The response could not carry a footer, so it said nothing.
        *
        * CONFIRMED IN SOURCE: `respond()` in `src/app.py` emits the footer only
-       * on the text lane — a `?format=json` reply drops it. This client asks
+       * on the text lane. A `?format=json` reply drops it. This client asks
        * for JSON everywhere it can, so most of its traffic lands here.
        * `/export` likewise streams with no footer.
        */
@@ -80,8 +80,8 @@ export type BudgetReading =
  * The threshold below which the server starts appending a footer.
  *
  * CONFIRMED IN SOURCE, `src/limit.py`: `if left * 4 > per_min: return ""`. This
- * is a protocol behaviour rather than a deployment knob — it takes no
- * environment variable and appears in no published document — so it is named
+ * is a protocol behaviour rather than a deployment knob. It takes no
+ * environment variable and appears in no published document, so it is named
  * here with its source rather than read at runtime. It is used only to describe
  * what an absent footer implies, never to decide anything.
  */
@@ -94,7 +94,7 @@ export interface PublishedLimits {
   readonly writesPerMinutePerIp: number;
   /**
    * STATED by `/config` and `/.well-known/agent.json`, and by the server's
-   * `CHAT_RATE_ROOMS_PER_DAY`. Not a token bucket — the prose's "two token
+   * `CHAT_RATE_ROOMS_PER_DAY`. Not a token bucket. The prose's "two token
    * buckets" is accurate about token buckets, and this is a daily counter
    * alongside them.
    *
@@ -104,7 +104,7 @@ export interface PublishedLimits {
    * mode nothing documents.
    */
   readonly newRoomsPerDayPerIp: number | null;
-  /** STATED: limits.long_poll_seconds — the ceiling `wait=` is clamped to. */
+  /** STATED: limits.long_poll_seconds, the ceiling `wait=` is clamped to. */
   readonly longPollSeconds: number | null;
   readonly messageChars: number | null;
   readonly noteChars: number | null;
@@ -196,7 +196,7 @@ export async function discoverConfig(
  *   f"(refills {refill_rate(per_min)}; a 429 states the wait, and the full "
  *   f"limits are in /.well-known/agent.json)"
  *
- * `kind` is `read` or `write`, pluralised — so `reads` or `writes`.
+ * `kind` is `read` or `write`, pluralised, so `reads` or `writes`.
  */
 const BUDGET_FOOTER = /^#\s*budget:\s*(\d+)\s+of\s+(\d+)\s+(read|write)s\s+left/im;
 
@@ -323,7 +323,7 @@ export class BudgetTracker {
 
     if (input.carriesFooter) {
       // No footer on a lane that emits them: STATED, that means above a
-      // quarter. A bound, and deliberately not a number.
+      // quarter. A bound, not a number.
       return this.#store({ state: 'above-quarter', bucket: input.bucket, observedAt });
     }
 
@@ -344,7 +344,7 @@ export class BudgetTracker {
  * A parked long-poll costs one read, charged when it starts.
  *
  * STATED [LIMITS]: "A parked wait= request costs one read, charged when it
- * starts." Not on completion — so a poll loop that counts finished requests
+ * starts." Not on completion, so a poll loop that counts finished requests
  * undercounts its own spend, and a loop of ten-second waits is spending a read
  * every ten seconds whether or not anything arrives.
  *

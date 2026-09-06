@@ -202,7 +202,7 @@ describe('signed write', () => {
 describe('every error class reaches the caller from a mocked response', () => {
   const identity = Identity.create();
   // `lane` says which lane the case must be exercised on. 413 belongs on POST:
-  // STATED, it is the 256 KiB body cap, and a GET carries no body — so a 413
+  // STATED, it is the 256 KiB body cap, and a GET carries no body, so a 413
   // answering a GET is the edge complaining about the URL instead, which is a
   // different class entirely (see the URL-budget suite below).
   const cases: readonly (readonly [number, string, new (...args: never[]) => Error, 'get' | 'post'])[] =
@@ -365,7 +365,7 @@ describe('the transport learns its edge budget downward', () => {
     expect(error.message).toContain(String(error.urlBytes));
   });
 
-  it('does not retry — the caller decides', async () => {
+  it('does not retry; the caller decides', async () => {
     const mock = edge(1000);
     const transport = new Transport({ fetch: mock.fn, maxUrlBytes: 16384 });
     await expect(
@@ -481,7 +481,7 @@ describe('a generic 400 on the GET lane may be an edge, not a parameter', () => 
   // STATED [PARAMETERS]: the application's 400 "names the field", e.g.
   // "400 bad from: must be a string". Some edges answer an over-long request
   // line with 400 instead of 414, which collides with that. The two want
-  // opposite recoveries, so the possibility is raised — and nothing more.
+  // opposite recoveries, so the possibility is raised, and nothing more.
   const APPLICATION_400 = '400 bad text: must be a string\n';
   const EDGE_400 = '<html><head><title>400 Bad Request</title></head><body></body></html>';
 

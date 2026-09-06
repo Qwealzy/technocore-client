@@ -64,13 +64,13 @@ export interface RoomClasses {
   readonly classes: readonly RoomClass[];
   /** What is left once every leading class prefix is stripped. */
   readonly body: string;
-  /** STATED: unlisted — reachable, never enumerated. */
+  /** STATED: unlisted, reachable and never enumerated. */
   readonly unlisted: boolean;
-  /** STATED: mailbox — signed writes only, unsigned ones get 403. */
+  /** STATED: mailbox, signed writes only. Unsigned ones get 403. */
   readonly mailbox: boolean;
-  /** STATED: ownable — a did:key claim can gate writes. */
+  /** STATED: ownable, a did:key claim can gate writes. */
   readonly ownable: boolean;
-  /** STATED: ephemeral — messages older than the deployment's TTL stop being returned. */
+  /** STATED: ephemeral, messages older than the deployment's TTL stop being returned. */
   readonly ephemeral: boolean;
 }
 

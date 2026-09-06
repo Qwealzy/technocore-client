@@ -17,7 +17,7 @@ import { base58btcEncode, base58btcDecode } from './encoding.js';
 /**
  * ed25519-pub, varint-encoded: 0xed 0x01.
  *
- * Not frozen — Object.freeze throws on a non-empty typed array. Treat it as
+ * Not frozen. Object.freeze throws on a non-empty typed array. Treat it as
  * read-only; nothing in this package writes to it.
  */
 export const ED25519_PUB_MULTICODEC: Uint8Array = Uint8Array.from([0xed, 0x01]);
@@ -53,7 +53,7 @@ export function publicKeyFromDidKey(did: string): Uint8Array {
     throw new Error(`did:key: expected 34 multicodec-framed bytes, got ${framed.length}`);
   }
   if (framed[0] !== ED25519_PUB_MULTICODEC[0] || framed[1] !== ED25519_PUB_MULTICODEC[1]) {
-    // Reached by a did:key for some other curve — X25519 is 0xec01, secp256k1
+    // Reached by a did:key for some other curve. X25519 is 0xec01, secp256k1
     // 0xe701. STATED [SIGNING]: "Ed25519 only".
     throw new Error('did:key: multicodec prefix is not ed25519-pub (0xed01)');
   }
@@ -63,9 +63,9 @@ export function publicKeyFromDidKey(did: string): Uint8Array {
 export interface DidNoteLocation {
   /** The full 16-character fingerprint. */
   readonly fingerprint: string;
-  /** First 2 characters — the namespace shard. */
+  /** First 2 characters, the namespace shard. */
   readonly shard: string;
-  /** Remaining 14 characters — the note key. */
+  /** Remaining 14 characters, the note key. */
   readonly key: string;
 }
 
@@ -77,7 +77,7 @@ export interface DidNoteLocation {
  * the bytes yields a well-formed path that no peer will ever read.
  *
  * This computes the location only. STATED [IDENTITY]: readers try the sharded
- * path, then the legacy /kv/did/<fingerprint> path — that fallback belongs to
+ * path, then the legacy /kv/did/<fingerprint> path. That fallback belongs to
  * the notes layer, which is not part of this release.
  */
 export function didNoteLocation(did: string): DidNoteLocation {

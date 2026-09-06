@@ -7,7 +7,7 @@
  * for this file are known-answer tests against externally published values.
  */
 
-/** base58btc — the Bitcoin alphabet, as multibase 'z' requires. */
+/** base58btc, the Bitcoin alphabet, as multibase 'z' requires. */
 const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 const B58_INDEX: ReadonlyMap<string, number> = new Map(
@@ -105,7 +105,7 @@ export function base64urlDecodeCanonical(text: string, expectedBytes?: number): 
     throw new Error(`base64url: decoded ${decoded.length} bytes, expected ${expectedBytes}`);
   }
   if (base64urlEncode(decoded) !== text) {
-    throw new Error('base64url: encoding is not canonical — re-encode the raw bytes rather than editing the tail');
+    throw new Error('base64url: encoding is not canonical, re-encode the raw bytes rather than editing the tail');
   }
   return decoded;
 }

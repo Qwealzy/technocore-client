@@ -51,7 +51,7 @@ describe('the extraction rule', () => {
   it('is unaffected by the budget footer, which lands AFTER the value', () => {
     // The whole reason the rule changed. `note_read` returns
     // f"{BANNER}\n\n{value}" + budget_note(...), and budget_note is the empty
-    // string until the caller drops below a quarter of the read bucket — so
+    // string until the caller drops below a quarter of the read bucket, so
     // this case only ever appears under load, and a probe in normal conditions
     // cannot produce it. Constructed from the source shape rather than probed.
     const withFooter = noteBody('step 4 done', true);
@@ -205,7 +205,7 @@ describe('a lost race is a 409, and the recovery is to rebase', () => {
     const ack = await n.update('p-scratch', 'state', (current) => `${current ?? ''}!`);
     expect(ack.bytes).toBe(1);
     // Three calls: the initial read, the losing write, the rebased write. No
-    // second read — the 409 body is what the rebase came from.
+    // second read. The 409 body is what the rebase came from.
     expect(mock.calls).toHaveLength(3);
     expect(mock.calls[2]?.url).toContain(encodeURIComponent('step 5 done'));
     expect(mock.calls[2]?.url).toContain(encodeURIComponent('step 5 done!'));

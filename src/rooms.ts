@@ -25,7 +25,7 @@ import { InvalidFieldError } from './errors.js';
  * rewinds".
  *
  * Those produce an identical response. A gap in an `e-` room is therefore
- * ambiguous, and this type says so rather than picking one — the distinction
+ * ambiguous, and this type says so rather than picking one. The distinction
  * matters because ring overflow means you were reading too slowly, while TTL
  * expiry can happen to a reader that was keeping up perfectly.
  */
@@ -47,7 +47,7 @@ export type GapCause =
    * not the next n in order. With `since` far behind, `first_seq` came back as
    * `last_seq - limit + 1` at every limit tried, while the records in between
    * were still present in the room's export. So a full page with a gap does
-   * not prove anything was lost — only that this response could not carry it.
+   * not prove anything was lost, only that this response could not carry it.
    */
   | 'page-truncated';
 
@@ -73,7 +73,7 @@ export interface ReadGap {
    * The page came back exactly as full as the limit allowed.
    *
    * Null when no limit was sent, because the default is a protocol constant
-   * this client does not assume — with no limit sent, truncation cannot be
+   * this client does not assume. With no limit sent, truncation cannot be
    * ruled out either.
    */
   readonly pageWasFull: boolean | null;
@@ -84,7 +84,7 @@ export interface ReadGap {
  *
  * A tagged union rather than a struct with flags, so that `wait-not-held`
  * cannot be handled by accident as though it were `quiet`. Those two arrive
- * identically — a 200 with no messages — and want opposite reactions.
+ * identically, as a 200 with no messages, and want opposite reactions.
  */
 export type CursorStep =
   | {
@@ -184,9 +184,9 @@ function detectGap(
  * A position in a room, and the only supported way to advance it.
  *
  * Open it with `RoomCursor.open`, which does an ordinary read first. That is
- * not a convenience: STATED [WAITING], `wait=` works only "together with
- * since=", so there is no request that means "block until the first message" —
- * a follower has to learn a cursor before it can wait on one.
+ * not a convenience. STATED [WAITING], `wait=` works only "together with
+ * since=", so there is no request that means "block until the first message".
+ * A follower has to learn a cursor before it can wait on one.
  */
 export class RoomCursor {
   readonly room: RoomName;
@@ -263,7 +263,7 @@ export class RoomCursor {
       // STATED [WAITING]: wait_held is "Present only on a wait= read that
       // returned no messages". False means no slot was free.
       //
-      // Absent means the wait was held — STATED: "without that signal the wait
+      // Absent means the wait was held. STATED: "without that signal the wait
       // really was held". PROBED 2026-09-05: absent ALSO happens when wait is
       // sent with no since, because the server never treats it as a wait at
       // all. That case cannot arise here: the transport refuses a wait without
@@ -343,8 +343,8 @@ export class RoomCursor {
 
       // Always yields to the macrotask queue, even at zero.
       //
-      // A poll that resolves through microtasks alone — a cached reply, a
-      // stubbed transport, a server answering instantly — would otherwise
+      // A poll that resolves through microtasks alone, a cached reply, a
+      // stubbed transport, a server answering instantly, would otherwise
       // starve every timer in the process, including the AbortSignal that is
       // supposed to stop this loop. `await` on an already-settled promise does
       // not give timers a turn; setTimeout does.

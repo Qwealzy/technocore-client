@@ -77,13 +77,13 @@ export interface NoteWriteAck {
  * value cannot contain a newline: the banner is line 0, the blank is line 1,
  * and line 2 is the whole of the value.
  *
- * The rule this replaces — everything after the first blank line, minus one
- * trailing newline — is wrong, and wrong only under load. CONFIRMED IN SOURCE:
+ * The rule this replaces, everything after the first blank line minus one
+ * trailing newline, is wrong, and wrong only under load. CONFIRMED IN SOURCE:
  * `note_read` appends `budget_note(...)` AFTER the value, and `budget_note`
  * returns the empty string while `left * 4 > per_min`. So above a quarter of
  * the read bucket the old rule is perfect, and below it the value comes back
- * with `\n# budget: 140 of 600 reads left this minute (…)` glued to the end —
- * after which every `?if=` compares that against the stored value and loses,
+ * with `\n# budget: 140 of 600 reads left this minute (…)` glued to the end.
+ * After that every `?if=` compares that against the stored value and loses,
  * for as long as the caller stays busy.
  *
  * A live compare-and-set confirmed the broken rule, because the probe was
@@ -136,7 +136,7 @@ export class Notes {
    * Reads a note, or null when nothing has been written there.
    *
    * STATED [openapi 404] and CONFIRMED IN SOURCE: "Absent and never-written are
-   * the same state here", so this returns null rather than throwing — a missing
+   * the same state here", so this returns null rather than throwing. A missing
    * note is an ordinary answer, not a failure.
    */
   async get(namespace: string, key: string): Promise<NoteRead | null> {
@@ -220,7 +220,7 @@ export class Notes {
    *
    * **Not a precedent for retrying anything else.** This loop is allowed only
    * because each attempt sends different bytes derived from what the server
-   * just reported — that is what compare-and-set *is*, not a retry of the same
+   * just reported. That is what compare-and-set *is*, not a retry of the same
    * write. Resending identical bytes after a refusal is the thing the no-retry
    * rule forbids, and nothing here does it.
    *
@@ -266,7 +266,7 @@ export class Notes {
    * Lists the keys in a namespace.
    *
    * STATED [PRIVATE]: `p-` keys are never enumerated, and namespaces are never
-   * enumerated at all — so this shows what is listable, not what exists.
+   * enumerated at all, so this shows what is listable, not what exists.
    */
   async list(namespace: string): Promise<readonly string[]> {
     const ns = makeNamespace(namespace);

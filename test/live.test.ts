@@ -168,7 +168,7 @@ describe.skipIf(!live)('live: cursor reads and long-polling', () => {
     const elapsed = Date.now() - started;
 
     // PROBED 2026-09-05: the server holds the request and reports wait_held
-    // true. The elapsed time is approximate — observed overshoot of a second
+    // true. The elapsed time is approximate. An observed overshoot of a second
     // or two is normal, so this asserts a floor rather than a window.
     expect(step.kind).toBe('quiet');
     expect(elapsed).toBeGreaterThan(2000);
@@ -191,7 +191,7 @@ describe.skipIf(!live)('live: limits are discovered, not assumed', () => {
   it('reads what this deployment enforces, which is not the documented default', async () => {
     // The reason limits.ts exists. The server's own config.py defaults are 120
     // and 30; technocore.chat runs five and ten times that. Asserting only the
-    // relationship, not the numbers — a deployment may change either.
+    // relationship, not the numbers. A deployment may change either.
     const limits = await discoverLimits();
     expect(limits.readsPerMinutePerIp).toBeGreaterThan(0);
     expect(limits.writesPerMinutePerIp).toBeGreaterThan(0);

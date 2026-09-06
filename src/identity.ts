@@ -40,9 +40,9 @@ const ED25519_SPKI_HEADER_LENGTH = 12;
  * Supplies a passphrase when one is needed.
  *
  * A passphrase is never a parameter of these constructors, and never something
- * this library writes down. The caller provides a function that obtains it —
- * interactively, from an agent, from an OS keychain — and the value is used
- * once and dropped. It is never stored on the Identity, never logged, and never
+ * this library writes down. The caller provides a function that obtains it,
+ * interactively, from an agent, or from an OS keychain. The value is used once
+ * and dropped. It is never stored on the Identity, never logged, and never
  * placed in an error message.
  */
 export type PassphraseProvider = () => string | Promise<string>;
@@ -50,7 +50,7 @@ export type PassphraseProvider = () => string | Promise<string>;
 export interface SignedText {
   readonly did: string;
   readonly nonce: string;
-  /** The swept text — the bytes that were signed and the bytes to send. */
+  /** The swept text. The bytes that were signed and the bytes to send. */
   readonly text: string;
   /** Canonical base64url, 86 characters, final character one of A Q g w. */
   readonly sig: string;
@@ -116,8 +116,8 @@ export class Identity {
     try {
       privateKey = createPrivateKey({ key: Buffer.from(der), format: 'der', type: 'pkcs8' });
     } catch {
-      // Deliberately not rethrowing the original: its message and stack are
-      // built by OpenSSL around the material we just handed it.
+      // The original is not rethrown. Its message and stack are built by
+      // OpenSSL around the material we just handed it.
       throw new Error('identity: could not build a key from the supplied seed (details withheld)');
     }
     return Identity.#from(privateKey);
@@ -139,7 +139,7 @@ export class Identity {
     let privateKey: KeyObject;
     {
       // The passphrase lives only in this block and must not reach a thrown
-      // value; the scope is deliberately as small as the parse itself.
+      // value. The scope is as small as the parse itself.
       const passphrase = await provider();
       try {
         privateKey = createPrivateKey({ key: pem, format: 'pem', passphrase });
@@ -188,7 +188,7 @@ export class Identity {
    * Signs a room message.
    *
    * STATED [SIGNING]: the signature covers `<room>|<nonce>|<text>` over the text
-   * AFTER the sweep. The returned `text` is that swept text — send exactly it,
+   * AFTER the sweep. The returned `text` is that swept text. Send exactly it,
    * not the string you passed in.
    */
   signMessage(room: string, nonce: string, rawText: string): SignedText {

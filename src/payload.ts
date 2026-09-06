@@ -23,7 +23,7 @@ export const NONCE_PATTERN = /^[0-9]{1,19}$/;
 export interface Signable {
   /** The UTF-8 string to sign. */
   readonly payload: string;
-  /** The swept text — send exactly this, not what you passed in. */
+  /** The swept text. Send exactly this, not what you passed in. */
   readonly text: string;
 }
 

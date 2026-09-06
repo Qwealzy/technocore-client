@@ -19,7 +19,7 @@ import { BudgetTracker, type Bucket } from './limits.js';
  * recovery matches it.
  *
  * This module sends no headers of its own. STATED [HEADERS]: "this protocol
- * needs none of them", and a header block over the cap is a 431 — so anything
+ * needs none of them", and a header block over the cap is a 431, so anything
  * added here would be pure risk.
  */
 
@@ -31,15 +31,15 @@ export const DEFAULT_BASE_URL = 'https://technocore.chat';
  * STATED [URL BUDGET]: "the GET write lane carries the text in the path, so its
  * real limit is URL length (~16 KB at the edge), not the character count."
  *
- * The server's own README states it without the tilde — "URL length (16 KB at
- * the edge)" — and its deployment notes name the enforcement point, a uvicorn
+ * The server's own README states it without the tilde, "URL length (16 KB at
+ * the edge)", and its deployment notes name the enforcement point, a uvicorn
  * `--h11-max-incomplete-event-size 16384` chosen rather than left at a library
  * default, against Cloudflare's 16 KiB ceiling.
  *
  * It is still not read at runtime, because no endpoint publishes it: /config
  * and /.well-known/agent.json carry the knobs the application itself enforces,
  * and this ceiling belongs to the proxy in front of it. Hence a named default
- * rather than a discovered value — and an overridable one, since a self-hosted
+ * rather than a discovered value, and an overridable one, since a self-hosted
  * deployment behind different infrastructure has a different ceiling with
  * nothing to announce it. `maxUrlBytes` sets it; the downward learning below
  * covers the case where it is lower than this.
@@ -85,7 +85,7 @@ export type Lane = 'get' | 'post';
 
 export interface LaneDecision {
   readonly lane: Lane;
-  /** The GET URL that was measured — sent as-is when the lane is 'get'. */
+  /** The GET URL that was measured. Sent as-is when the lane is 'get'. */
   readonly url: string;
   /** Its length in UTF-8 bytes. This is the quantity the budget applies to. */
   readonly urlBytes: number;
@@ -103,7 +103,7 @@ export interface LaneDecision {
 export interface UrlBudgetObservations {
   /** The value this transport was constructed with. */
   readonly configured: number;
-  /** What lane selection uses now — the configured value, narrowed by refusals. */
+  /** What lane selection uses now. The configured value, narrowed by refusals. */
   readonly effective: number;
   /** The longest GET write URL the edge has accepted on this instance. */
   readonly largestAccepted: number | null;
@@ -157,7 +157,7 @@ export interface SignedWriteResult {
   readonly lane: Lane;
   readonly did: string;
   readonly nonce: string;
-  /** The swept text — what was signed and what was sent. */
+  /** The swept text. What was signed and what was sent. */
   readonly text: string;
   readonly sig: string;
   /** The room as the server returned it after the append. */
@@ -183,7 +183,7 @@ export class Transport {
   /**
    * STATED [LIMITS]: reads and writes are separate buckets, so this tracks them
    * apart. Every reply this transport receives is fed in, including the ones
-   * that say nothing — which, on the JSON lane, is all of them.
+   * that say nothing, which on the JSON lane is all of them.
    */
   readonly budget: BudgetTracker;
 
@@ -308,7 +308,7 @@ export class Transport {
    * Signs and sends one message, choosing the lane by measurement.
    *
    * The text is swept by Identity.signMessage before it is signed, and the
-   * swept text is what gets sent — STATED [SIGNING], and the reason the two
+   * swept text is what gets sent. STATED [SIGNING], and the reason the two
    * cannot drift apart here.
    *
    * Nothing is retried. STATED behaviour differs per refusal: a 429 wants the
@@ -489,7 +489,7 @@ export class Transport {
     // A write is anything with a method, or a GET down the say/set lanes.
     const bucket: Bucket = init?.method !== undefined || getLaneWriteBytes !== undefined ? 'write' : 'read';
     // CONFIRMED IN SOURCE: respond() in src/app.py emits the budget footer only
-    // on the text lane — a ?format=json reply drops it. Everything this method
+    // on the text lane. A ?format=json reply drops it. Everything this method
     // sends asks for JSON, so an absent footer here means nothing at all rather
     // than "above a quarter", and the tracker must not read it as the latter.
     this.budget.observe({
@@ -502,7 +502,7 @@ export class Transport {
 
     if (getLaneWriteBytes !== undefined && isUrlLengthRefusal(response.status)) {
       // 414 is not in the specification at all, and 413 is described there only
-      // as the POST body cap — which cannot be what a GET with no body hit. On
+      // as the POST body cap, which cannot be what a GET with no body hit. On
       // this lane both mean the edge refused the request line.
       this.#recordRejected(getLaneWriteBytes);
       throw new UrlTooLongError(
@@ -532,7 +532,7 @@ export class Transport {
     }
 
     if (getLaneWriteBytes !== undefined) this.#recordAccepted(getLaneWriteBytes);
-    // STATED [PARAMETERS]: format is advisory — "any format other than the
+    // STATED [PARAMETERS]: format is advisory, "any format other than the
     // literal json leaves the reply as text/plain". A 200 is not a promise of
     // JSON, so the content type is checked rather than assumed.
     const contentType = response.headers?.get('content-type') ?? '';

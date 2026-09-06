@@ -59,8 +59,8 @@ describe('discovery reads what the deployment enforces', () => {
   it('carries the room-creation limit without pretending to know its failure mode', async () => {
     const limits = await discoverLimits({ fetch: json(AGENT_JSON).fn });
     expect(limits.newRoomsPerDayPerIp).toBe(20);
-    // Deliberately just a number: the spec never says what happens when it is
-    // hit, so there is no error class and no handling for it.
+    // Just a number. The spec never says what happens when it is hit, so
+    // there is no error class and no handling for it.
   });
 
   it('uses a discovery path that is never rate limited', async () => {
@@ -177,7 +177,7 @@ describe('unknown is not plenty', () => {
   it('stays unknown when the lane could not have carried a footer', () => {
     // CONFIRMED IN SOURCE: respond() drops the note for ?format=json, and
     // /export streams with none. This client asks for JSON everywhere it can,
-    // so most replies say nothing about the budget — and saying nothing is not
+    // so most replies say nothing about the budget, and saying nothing is not
     // the same as saying "plenty".
     const tracker = new BudgetTracker();
     const reading = tracker.observe({
