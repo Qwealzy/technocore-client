@@ -285,8 +285,10 @@ Grouped by area. The label sits on the claim, not on the advice.
 **Zs is not in the sweep set.** *(STATED, SINGLE LINE, by omission)*
 The categories are Cc, Cf, Cs, Co, Zl, Zp. U+00A0 and U+3000 survive the substitution pass untouched. Adding Zs "for tidiness" would break signing. See Q1 for the trim-time interaction.
 
-**The character caps are measured after the sweep.** *(INFERRED)*
-STATED (`/openapi.json`, 400): a text "left empty by the single-line sweep, or one past the character cap" is refused. That the 4096/8192 counts apply to the swept text rather than the input is our reading, not a statement. We validate emptiness locally either way, because on the signed lane a rejected write has already spent a nonce.
+**The character caps are measured after the sweep.** *(CONFIRMED IN SOURCE 2026-09-06)*
+STATED (`/openapi.json`, 400): a text "left empty by the single-line sweep, or one past the character cap" is refused. The prose never orders the two checks. `src/store.py:446-476` does: `clean_text` substitutes every sweepable character, trims, raises on an empty result, and only then compares `len(text)` against the limit. So the cap applies to the stored text, not to what you passed in.
+
+A client that measures before sweeping over-rejects its own writes. Leading or trailing sweepable padding is gone by the time the server counts, so a text the server would have accepted looks one character too long locally. We validate emptiness locally either way, because on the signed lane a rejected write has already spent a nonce.
 
 **Do not recover a payload by splitting a stored one on `|`.** *(INFERRED)*
 The text may contain `|`. The format is unambiguous only because the room name and the nonce cannot. `src/verify.ts` rebuilds the payload from known fields and never parses one apart.
