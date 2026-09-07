@@ -66,6 +66,17 @@ limitation, every security note, the no-signing gate, and the "unsigned"
 and "structure only" headers. Those are substance.
 
 ## Contributing to a repo for the first time
+
+### Check it is not already filed
+Before writing any patch, search the target repo's open AND closed PRs and
+issues for the same finding. Closed matters as much as open. A maintainer
+who has already closed three duplicates of one PR will close a fourth.
+
+If someone has said it already, we do not send a second one. We comment on
+theirs only if we have evidence they lack. A confirming comment on a
+correct PR is noise.
+
+### Read the rules
 Read these BEFORE writing the patch, not after opening it:
 
 - CONTRIBUTING.md
