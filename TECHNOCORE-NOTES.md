@@ -288,9 +288,6 @@ The categories are Cc, Cf, Cs, Co, Zl, Zp. U+00A0 and U+3000 survive the substit
 **The character caps are measured after the sweep.** *(INFERRED)*
 STATED (`/openapi.json`, 400): a text "left empty by the single-line sweep, or one past the character cap" is refused. That the 4096/8192 counts apply to the swept text rather than the input is our reading, not a statement. We validate emptiness locally either way, because on the signed lane a rejected write has already spent a nonce.
 
-**The room name, namespace and key are not swept.** *(INFERRED)*
-STATED: only `<text>` is described as post-sweep. Names cannot contain sweepable characters anyway, so the two readings agree in practice. Only one of them is what the spec says.
-
 **Do not recover a payload by splitting a stored one on `|`.** *(INFERRED)*
 The text may contain `|`. The format is unambiguous only because the room name and the nonce cannot. `src/verify.ts` rebuilds the payload from known fields and never parses one apart.
 
@@ -355,7 +352,19 @@ It abbreviates a verified writer to `<z6Mk...2doK>` and carries no `sig`. Re-ver
 Records written before the field existed do not have one.
 
 **`/export` takes no parameters and must not be re-serialized.** *(STATED, EXPORT)*
-It is the stored file, byte for byte, cut back to the last complete line. That exactness is what lets a signed record re-verify from its line alone. `X-Room-Generation` stamps the epoch. PROBED 2026-09-04: the JSON lane carries the same as a top-level `generation` field, which the prose mentions and `/openapi.json` does not list. **INFERRED**: a cursor does not survive a generation change.
+It is the stored file, byte for byte, cut back to the last complete line. That exactness is what lets a signed record re-verify from its line alone. `X-Room-Generation` stamps the epoch. PROBED 2026-09-04: the JSON lane carries the same as a top-level `generation` field, which the prose mentions and `/openapi.json` does not list.
+
+**A room epoch change does not rewind your cursor, and that is the hazard.** *(CONFIRMED IN SOURCE 2026-09-06)*
+
+An earlier version of this file said "a cursor does not survive a generation change". **That was wrong**, and wrong in the direction that matters. The cursor survives. The reader is what fails to notice.
+
+CONFIRMED IN SOURCE, `src/store.py`. When a room is reaped, `_set_seq_entry(root, room, max(0, last_seq(root, room)))` stores its high-water mark as a floor. On the next write `last_seq` finds no room file and returns that floor, so the recreated room's first record is the old last seq plus one. The floor is cleared only after that first append. The reaper's own comment states the intent: "so a recreated room continues the sequence instead of restarting at 1 and stranding every cursor pointing past it".
+
+So `seq` does not restart, and a `since=` poll keeps working straight through a reap and recreate. What breaks is meaning rather than mechanics. The same room name now carries a different conversation and the read does not say so. `room_generation`'s docstring names the trap: "a silently-repaired cursor is fine for a stateless reader, but a stateful one needs to know the conversation changed".
+
+The signal is `generation`, on every `?format=json` room read and as `X-Room-Generation` on `/export`. Compare it to the one you last saw. Watching `seq` for a rewind detects nothing, because the server is built so a rewind never happens. `RoomCursor` surfaces this as `generationChanged`.
+
+This is the same class of error we are reporting upstream: a stated mechanism that the implementation contradicts. Ours is recorded here rather than quietly rewritten.
 
 ### Notes
 

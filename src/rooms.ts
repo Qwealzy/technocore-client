@@ -254,8 +254,17 @@ export class RoomCursor {
     });
 
     // STATED [EXPORT / the generation field]: a room that was reaped and
-    // recreated is a new epoch, and seq restarts with it. A cursor from the
-    // previous epoch means nothing, so it is replaced rather than compared.
+    // recreated is a new epoch.
+    //
+    // CONFIRMED IN SOURCE 2026-09-06, and it corrects an earlier comment here
+    // that said seq restarts with the epoch. It does not. The reaper stores the
+    // room's high-water mark as a floor and the recreated room continues from
+    // it, so a cursor keeps working across the change and never rewinds. That
+    // is the hazard rather than the comfort: the mechanics survive while the
+    // meaning does not, because the same name now carries a different
+    // conversation. `generation` is the only signal that says so, which is why
+    // it is surfaced here instead of watching seq for a rewind that the server
+    // is built never to produce.
     const generationChanged = page.generation !== this.#generation;
     this.#generation = page.generation;
 
