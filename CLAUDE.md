@@ -65,6 +65,19 @@ This is style only. It does not change content. Keep every caveat, every
 limitation, every security note, the no-signing gate, and the "unsigned"
 and "structure only" headers. Those are substance.
 
+## Contributing to a repo for the first time
+Read these BEFORE writing the patch, not after opening it:
+
+- CONTRIBUTING.md
+- SECURITY.md, and decide whether the finding belongs in a private
+  advisory rather than a public issue or PR
+- AGENTS.md, or whatever the repo calls its rules-for-editors file
+- .github/pull_request_template.md and .github/ISSUE_TEMPLATE/*
+
+Then report to me what they require. A --body-file silently overwrites a
+PR template, and a checklist item like a CHANGELOG entry is easy to miss
+once the PR is already open.
+
 ## Scope
 - No token distribution, airdrop, or eligibility claim appears in the
   code, in comments, or in the README.
