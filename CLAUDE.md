@@ -65,7 +65,7 @@ This is style only. It does not change content. Keep every caveat, every
 limitation, every security note, the no-signing gate, and the "unsigned"
 and "structure only" headers. Those are substance.
 
-## Contributing to a repo for the first time
+## Contributing upstream
 
 ### Check it is not already filed
 Before writing any patch, search the target repo's open AND closed PRs and
@@ -76,7 +76,7 @@ If someone has said it already, we do not send a second one. We comment on
 theirs only if we have evidence they lack. A confirming comment on a
 correct PR is noise.
 
-### Read the rules
+### Read the rules, on the first contribution to a repo
 Read these BEFORE writing the patch, not after opening it:
 
 - CONTRIBUTING.md
@@ -88,6 +88,13 @@ Read these BEFORE writing the patch, not after opening it:
 Then report to me what they require. A --body-file silently overwrites a
 PR template, and a checklist item like a CHANGELOG entry is easy to miss
 once the PR is already open.
+
+### Reference other repos by full name
+Cross-repo references in commit messages, PR bodies and issue bodies use
+owner/repo#NNN, never a bare number. A bare reference resolves against
+whatever repo it is read in. It looks correct locally and misleads
+everywhere else, and the failure can lie dormant for years, surfacing the
+day the wrong repo reaches that number.
 
 ## Scope
 - No token distribution, airdrop, or eligibility claim appears in the
