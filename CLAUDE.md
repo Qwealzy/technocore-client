@@ -76,6 +76,12 @@ If someone has said it already, we do not send a second one. We comment on
 theirs only if we have evidence they lack. A confirming comment on a
 correct PR is noise.
 
+Search again immediately before posting, not only before drafting. A check
+goes stale. In an active repo a thread can gain a substantive reply within
+hours, and a comment written against a three-day-old reading can repeat or
+contradict what is already there. Re-read the target thread in full, then
+post.
+
 ### Read the rules, on the first contribution to a repo
 Read these BEFORE writing the patch, not after opening it:
 
