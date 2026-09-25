@@ -12,6 +12,14 @@ did.txt
 flop-did-create.cjs
 flop-post.cjs
 
+# Local ops files. They act on the live service from this machine and are
+# not part of the library.
+note-refresh.mjs
+note-refresh.log
+note-value.txt
+close*-owner.json
+register-organizer-*.json
+
 # Build output.
 dist/
 
